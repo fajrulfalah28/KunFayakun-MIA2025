@@ -1,28 +1,94 @@
-import { useState, useEffect } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
+import { useState, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
   faUtensils,
   faMugHot,
   faCookie,
   faBowlRice,
   faIceCream,
-  faLeaf,
   faPepperHot,
-} from '@fortawesome/free-solid-svg-icons';
-import { semanticColors, brandColors, colors } from '../../styles/colors';
-import HalalIcon from '../icons/HalalIcon';
-import CheckBadgeIcon from '../icons/CheckBadgeIcon';
+  faPizzaSlice,
+  type IconDefinition,
+} from "@fortawesome/free-solid-svg-icons";
+import { semanticColors, brandColors, colors } from "../../styles/colors";
+import HalalIcon from "../icons/HalalIcon";
+import CheckBadgeIcon from "../icons/CheckBadgeIcon";
 
 // Category mapping for icons and colors
-const categoryMap: Record<string, { icon: typeof faUtensils | null; iconColor: string }> = {
-  'Makanan': { icon: faUtensils, iconColor: '#FF6B35' },
-  'Minuman': { icon: faMugHot, iconColor: '#4A90E2' },
-  'Cemilan': { icon: faCookie, iconColor: '#D2691E' },
-  'Kopi': { icon: faMugHot, iconColor: '#6F4E37' },
-  'Nusantara': { icon: faBowlRice, iconColor: semanticColors.textPrimary },
-  'Dessert': { icon: faIceCream, iconColor: '#FF69B4' },
-  'Diet': { icon: faLeaf, iconColor: '#90EE90' },
-  'Pedas': { icon: faPepperHot, iconColor: '#FF4500' },
+// const categoryMap: Record<
+//   string,
+//   { icon: typeof faUtensils | null; iconColor: string }
+// > = {
+//   Makanan: { icon: faUtensils, iconColor: "#FF6B35" },
+//   Minuman: { icon: faMugHot, iconColor: "#4A90E2" },
+//   Cemilan: { icon: faCookie, iconColor: "#D2691E" },
+//   Kopi: { icon: faMugHot, iconColor: "#6F4E37" },
+//   Nusantara: { icon: faBowlRice, iconColor: semanticColors.textPrimary },
+//   Dessert: { icon: faIceCream, iconColor: "#FF69B4" },
+//   Diet: { icon: faLeaf, iconColor: "#90EE90" },
+//   Pedas: { icon: faPepperHot, iconColor: "#FF4500" },
+// };
+
+const detectCategory = (
+  categories: string
+): { name: string; icon: IconDefinition; color: string }[] => {
+  const text = categories.toLowerCase();
+
+  const result: { name: string; icon: IconDefinition; color: string }[] = [];
+
+  const mapping = [
+    {
+      name: "Makanan",
+      keywords: ["ayam", "bakso", "mie", "nasi", "geprek", "goreng"],
+      icon: faUtensils,
+      color: "#FF6B35",
+    },
+    {
+      name: "Minuman",
+      keywords: ["teh", "kopi", "milk", "susu", "drink", "jus", "kafe"],
+      icon: faMugHot,
+      color: "#4A90E2",
+    },
+    {
+      name: "Cemilan",
+      keywords: ["snack", "cemilan", "kue", "jajanan"],
+      icon: faCookie,
+      color: "#D2691E",
+    },
+    { name: "Kopi", keywords: ["kopi"], icon: faMugHot, color: "#6F4E37" },
+    {
+      name: "Nusantara",
+      keywords: ["sate", "rawon", "soto", "pecel", "lalapan"],
+      icon: faBowlRice,
+      color: semanticColors.textPrimary,
+    },
+    {
+      name: "Dessert",
+      keywords: ["dessert", "es krim", "ice cream", "puding", "snack"],
+      icon: faIceCream,
+      color: "#FF69B4",
+    },
+    {
+      name: "Pizza",
+      keywords: ["pizza"],
+      icon: faPizzaSlice,
+      color: "#90EE90",
+    },
+    {
+      name: "Seafood",
+      keywords: ["ikan", "udang", "cumi", "seafood"],
+      icon: faPepperHot,
+      color: "#FF4500",
+    },
+  ];
+
+  mapping.forEach((m) => {
+    if (m.keywords.some((k) => text.includes(k))) {
+      result.push(m);
+    }
+  });
+
+  return result.slice(0, 2);
 };
 
 interface KiosCardProps {
@@ -36,6 +102,8 @@ interface KiosCardProps {
   isPilihanKami?: boolean;
   isHalal?: boolean;
   onClick?: () => void;
+  awningColor?: "yellow" | "red";
+  price?: number;
 }
 
 export default function KiosCard({
@@ -49,8 +117,13 @@ export default function KiosCard({
   isPilihanKami = false,
   isHalal = false,
   onClick,
+  awningColor = "red",
+  price,
 }: KiosCardProps) {
-  const awningColor = isPilihanKami ? colors.secondary[400] : brandColors.primary;
+  const awningColorFinal =
+    awningColor === "yellow"
+      ? colors.secondary[400] // kuning
+      : brandColors.primary; // merah
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
 
@@ -60,10 +133,10 @@ export default function KiosCard({
       setIsMobile(window.innerWidth < 640);
       setIsTablet(window.innerWidth >= 640 && window.innerWidth < 1024);
     };
-    
+
     checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
   const totalStripes = isMobile ? 19 : isTablet ? 17 : 15;
@@ -82,7 +155,7 @@ export default function KiosCard({
           alt={name}
           className="absolute inset-0 w-full h-full object-cover"
         />
-        
+
         {/* Striped Awning Overlay - Shrinks on hover */}
         <div className="absolute top-0 left-0 right-0 flex h-[20%] group-hover:h-[15%] transition-all duration-300">
           {/* Generate responsive stripes: 8 on mobile, 15 on desktop */}
@@ -90,8 +163,13 @@ export default function KiosCard({
             return (
               <div
                 key={i}
-                className={`flex-1 h-full rounded-b-[12px] ${i === 0 ? 'rounded-tl-[12px]' : ''} ${i === totalStripes - 1 ? 'rounded-tr-[12px]' : ''}`}
-                style={{ backgroundColor: i % 2 === 0 ? awningColor : brandColors.white }}
+                className={`flex-1 h-full rounded-b-[12px] ${
+                  i === 0 ? "rounded-tl-[12px]" : ""
+                } ${i === totalStripes - 1 ? "rounded-tr-[12px]" : ""}`}
+                style={{
+                  backgroundColor:
+                    i % 2 === 0 ? awningColorFinal : brandColors.white,
+                }}
               />
             );
           })}
@@ -104,7 +182,11 @@ export default function KiosCard({
         <div className="flex gap-[6px] items-center overflow-hidden">
           {isPilihanKami && (
             <div className="flex items-center gap-1 shrink-0">
-              <CheckBadgeIcon width={12} height={12} color={colors.secondary[400]} />
+              <CheckBadgeIcon
+                width={12}
+                height={12}
+                color={colors.secondary[400]}
+              />
               <span
                 className="font-dm-sans font-regular text-xs whitespace-nowrap"
                 style={{ color: semanticColors.textPrimary }}
@@ -113,7 +195,7 @@ export default function KiosCard({
               </span>
             </div>
           )}
-          
+
           {isHalal && (
             <div className="flex items-center gap-1 shrink-0">
               <HalalIcon width={12} height={12} />
@@ -125,30 +207,27 @@ export default function KiosCard({
               </span>
             </div>
           )}
-          
+
           {/* Category Tags */}
-          {categories.split(',').map((category, index) => {
-            const trimmedCategory = category.trim();
-            const categoryInfo = categoryMap[trimmedCategory];
-            
-            if (!categoryInfo || !categoryInfo.icon) return null;
-            
-            return (
-              <div key={index} className="flex items-center gap-1 shrink-0">
-                <FontAwesomeIcon
-                  icon={categoryInfo.icon}
-                  className="w-3 h-3"
-                  style={{ color: categoryInfo.iconColor, width: '12px', height: '12px' }}
-                />
-                <span
-                  className="font-dm-sans font-regular text-xs whitespace-nowrap"
-                  style={{ color: semanticColors.textPrimary }}
-                >
-                  {trimmedCategory}
-                </span>
-              </div>
-            );
-          })}
+          {detectCategory(categories).map((c, index) => (
+            <div key={index} className="flex items-center gap-1 shrink-0">
+              <FontAwesomeIcon
+                icon={c.icon}
+                className="w-3 h-3"
+                style={{
+                  color: c.color,
+                  width: "12px",
+                  height: "12px",
+                }}
+              />
+              <span
+                className="font-dm-sans font-regular text-xs whitespace-nowrap"
+                style={{ color: semanticColors.textPrimary }}
+              >
+                {c.name}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* Shop Name and Description */}
@@ -168,6 +247,15 @@ export default function KiosCard({
             </p>
           )}
         </div>
+
+        {price !== undefined && price > 0 && (
+          <p
+            className="font-dm-sans font-bold text-sm"
+            style={{ color: brandColors.secondary }}
+          >
+            Rp {price.toLocaleString("id-ID")}
+          </p>
+        )}
 
         {/* Location, Rating, Operating Hours */}
         <div className="flex items-center gap-[6px] text-xs">
@@ -247,4 +335,3 @@ export default function KiosCard({
     </div>
   );
 }
-

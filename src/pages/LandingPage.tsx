@@ -1,101 +1,487 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faUtensils,
-  faMugHot,
-  faCookie,
-  faChevronDown,
-  faChevronRight,
   faBowlRice,
+  faChevronRight,
+  faCookie,
+  faFish,
   faIceCream,
   faLeaf,
+  faMugHot,
   faPepperHot,
+  faPizzaSlice,
+  faUtensils,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  Button,
-  ChipSelector,
-  KiosCard,
   Banner,
-  HalalIcon,
+  Button,
   CheckBadgeIcon,
+  ChipSelector,
   FilterDropdown,
-  Header,
   Footer,
+  HalalIcon,
+  Header,
+  KiosCard,
 } from "../components";
-import { semanticColors, colors } from "../styles/colors";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { colors, semanticColors } from "../styles/colors";
+import {
+  type DocumentData,
+  QueryDocumentSnapshot,
+  collection,
+  getDocs,
+  limit,
+  query,
+} from "firebase/firestore";
 import { db } from "../firebase";
 
+const KIOS_COLLECTIONS = [
+  "Data Ayam & Geprek",
+  "Data Bakso & Mie",
+  "Data Jajanan & Snack",
+  "Data Kafe & Kopi",
+  "Data Katering & Lainnya",
+  "Data Pecel Lele",
+  "Data Pizza",
+  "Data Seafood",
+] as const;
+
+type FireKios = {
+  "Nama UMKM": string;
+  "Deskripsi UMKM"?: string;
+  Kategori?: string | string[];
+  Alamat?: string;
+  Rating?: number | string;
+  "Foto UMKM"?: string;
+  "Foto Tempat"?: string;
+  "Harga Produk"?: string;
+
+  "Jam Operasional"?: string;
+  "Pilihan Kami"?: boolean;
+  Halal?: boolean;
+};
+
+type UiKios = {
+  id: string; // doc.id
+  image: string;
+  placeImage: string;
+  price: number;
+  name: string;
+  description: string;
+  categories: string;
+  location: string;
+  rating: number;
+  operatingHours: string;
+  isPilihanKami: boolean;
+  isHalal: boolean;
+};
+
 interface LandingPageProps {
+  isLoggedIn: boolean;
   onNavigateToLogin: () => void;
   onNavigateToSignUp: () => void;
-  onNavigateToDetailKios: () => void;
+  onNavigateToDetailKios: (id: string) => void;
 }
 
+// ———————————————————————————————————
+// Helpers
+const guessImageByCategory = (kategori?: string | string[]) => {
+  const pick = (word: string) =>
+    `https://source.unsplash.com/featured/574x386/?${encodeURIComponent(
+      word
+    )}&sig=${Math.random()}`;
+  const cat = Array.isArray(kategori)
+    ? (kategori[0] || "").toLowerCase()
+    : (kategori || "").toLowerCase();
+  if (cat.includes("ayam")) return pick("grilled-chicken");
+  if (cat.includes("pizza")) return pick("pizza");
+  if (cat.includes("nasi")) return pick("rice");
+  if (cat.includes("seafood")) return pick("seafood");
+  if (cat.includes("bakso")) return pick("meatball soup");
+  if (cat.includes("sate")) return pick("satay");
+  if (cat.includes("mie")) return pick("noodles");
+  if (cat.includes("kopi")) return pick("coffee");
+  if (cat.includes("jus") || cat.includes("buah")) return pick("juice");
+  if (cat.includes("bakar") || cat.includes("grill")) return pick("grill");
+  if (cat.includes("kuah") || cat.includes("soto") || cat.includes("sop"))
+    return pick("soup");
+  if (cat.includes("goreng")) return pick("fried food");
+  return "https://images.unsplash.com/photo-1634871572365-8bc444e6faea?w=574&h=386&fit=crop&q=80&auto=format";
+};
+
+const parseBool = (value: unknown): boolean => {
+  if (value === true) return true;
+  if (value === false) return false;
+  if (typeof value === "string") {
+    return value.toLowerCase() === "true";
+  }
+  return false;
+};
+
+const toUiKios = (
+  doc: QueryDocumentSnapshot<DocumentData, DocumentData>
+): UiKios => {
+  const raw = doc.data() as Record<string, unknown>;
+  let ratingNum = 0;
+  if (typeof raw["Rating"] === "string") {
+    ratingNum = parseFloat(raw["Rating"] as string);
+  } else if (typeof raw["Rating"] === "number") {
+    ratingNum = raw["Rating"] as number;
+  }
+
+  let categories = "Makanan";
+  const rawKategori = raw["Kategori"];
+  if (Array.isArray(rawKategori)) {
+    categories = (rawKategori as string[]).join(", ");
+  } else if (typeof rawKategori === "string") {
+    categories = rawKategori as string;
+  }
+
+  const lowerCat = categories.toLowerCase();
+  const halalKeywords = CATEGORY_MAP["Halal"] || [];
+  const isHalalByCategory = halalKeywords.some((k) => lowerCat.includes(k));
+
+  return {
+    id: doc.id,
+
+    image:
+      (typeof raw["Foto UMKM"] === "string"
+        ? (raw["Foto UMKM"] as string)
+        : undefined) ||
+      guessImageByCategory(raw["Kategori"] as string | string[] | undefined),
+
+    placeImage:
+      typeof raw["Foto Tempat"] === "string"
+        ? (raw["Foto Tempat"] as string)
+        : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
+
+    price:
+      typeof raw["Harga Produk"] === "string"
+        ? parseInt(raw["Harga Produk"] as string)
+        : 0,
+
+    name:
+      (typeof raw["Nama UMKM"] === "string"
+        ? (raw["Nama UMKM"] as string)
+        : undefined) || "Nama UMKM",
+
+    description:
+      (typeof raw["Deskripsi UMKM"] === "string"
+        ? (raw["Deskripsi UMKM"] as string)
+        : undefined) ||
+      `Tentang ${
+        typeof raw["Nama UMKM"] === "string"
+          ? (raw["Nama UMKM"] as string)
+          : "UMKM"
+      }`,
+
+    categories,
+
+    location:
+      typeof raw["Alamat"] === "string"
+        ? (raw["Alamat"] as string).split(",")[0]
+        : "Indonesia",
+
+    rating: ratingNum,
+
+    operatingHours:
+      typeof raw["Jam Operasional"] === "string"
+        ? (raw["Jam Operasional"] as string)
+        : "08:00 - 20:00",
+    isPilihanKami:
+      parseBool(raw["Pilihan Kami"]) ||
+      parseBool(raw["pilihan kami"]) ||
+      parseBool(raw["Rekomendasi"]) ||
+      parseBool(raw["rekomendasi"]),
+
+    isHalal:
+      raw["Halal"] === true || raw["halal"] === true || isHalalByCategory,
+  };
+};
+
+const fetchAllKios = async (): Promise<UiKios[]> => {
+  const all: UiKios[] = [];
+
+  for (const colName of KIOS_COLLECTIONS) {
+    const colRef = collection(db, colName);
+    const snap = await getDocs(colRef);
+
+    snap.forEach((doc) => {
+      all.push(toUiKios(doc));
+    });
+  }
+
+  return all;
+};
+
+const getIconForCategory = (kategori: string) => {
+  const cat = kategori.toLowerCase();
+
+  // Cek berdasarkan chipDefs yang sudah ada
+  if (cat.includes("makanan")) return faUtensils;
+  if (cat.includes("minuman")) return faMugHot;
+  if (
+    cat.includes("cemilan") ||
+    cat.includes("snack") ||
+    cat.includes("jajanan")
+  )
+    return faCookie;
+  if (cat.includes("kopi") || cat.includes("kafe")) return faMugHot;
+  if (cat.includes("nusantara")) return faBowlRice;
+  if (cat.includes("dessert")) return faIceCream;
+  if (cat.includes("pizza")) return faLeaf;
+  if (cat.includes("seafood")) return faPepperHot;
+
+  // Tambahan dari KIOS_COLLECTIONS
+  if (cat.includes("ayam") || cat.includes("geprek")) return faUtensils;
+  if (cat.includes("bakso") || cat.includes("mie")) return faBowlRice;
+
+  return faUtensils;
+};
+
+const CATEGORY_MAP: Record<string, string[]> = {
+  Makanan: ["ayam", "bakso", "mie", "seafood", "lele", "sate", "pizza"],
+  Halal: [
+    "ayam",
+    "bakso",
+    "mie",
+    "seafood",
+    "lele",
+    "sate",
+    "pizza",
+    "kafe",
+    "ayam bakar",
+    "dessert",
+  ],
+  Minuman: ["kopi", "teh", "susu", "milkshake", "jus", "kafe"],
+  Cemilan: ["snack", "jajanan", "roti", "pastry", "kue"],
+  Kopi: ["kopi", "kafe"],
+  Nusantara: ["ayam bakar", "sate", "soto", "rawon", "pecel"],
+  Dessert: ["dessert", "es krim", "ice cream", "puding", "snack"],
+  Pizza: ["pizza"],
+  Seafood: ["seafood"],
+};
+
 export default function LandingPage({
+  isLoggedIn,
   onNavigateToLogin,
   onNavigateToSignUp,
   onNavigateToDetailKios,
 }: LandingPageProps) {
-  // Category filters with icon colors (for chip selector)
-  const categories = [
-    {
-      id: "all",
-      label: "Tampilkan Semua",
-      icon: faUtensils,
-      iconColor: semanticColors.textPrimary,
-    },
-    {
-      id: "featured",
-      label: "Pilihan Kami",
-      icon: null,
-      iconColor: colors.secondary[500],
-      useCheckBadge: true,
-    }, // Uses CheckBadgeIcon
-    {
-      id: "halal",
-      label: "Halal",
-      icon: null,
-      iconColor: undefined,
-      useHalalIcon: true,
-    }, // Uses HalalIcon component
-    { id: "food", label: "Makanan", icon: faUtensils, iconColor: "#FF6B35" }, // Orange
-    { id: "drinks", label: "Minuman", icon: faMugHot, iconColor: "#4A90E2" }, // Blue
-    { id: "snacks", label: "Cemilan", icon: faCookie, iconColor: "#D2691E" }, // Cookie/Brown
-    { id: "coffee", label: "Kopi", icon: faMugHot, iconColor: "#6F4E37" }, // Coffee/Brown
-    {
-      id: "nusantara",
-      label: "Nusantara",
-      icon: faBowlRice,
-      iconColor: semanticColors.textPrimary,
-    },
-    { id: "dessert", label: "Dessert", icon: faIceCream, iconColor: "#FF69B4" }, // Pink
-    { id: "diet", label: "Diet", icon: faLeaf, iconColor: "#90EE90" }, // Light Green
-    { id: "pedas", label: "Pedas", icon: faPepperHot, iconColor: "#FF4500" }, // Red Orange
-  ];
+  // Search/filter UI
+  const [locationSearch, setLocationSearch] = useState("");
+  const [umkmSearch, setUmkmSearch] = useState("");
+  const [timeFilter, setTimeFilter] = useState<string>("");
+  const [priceFilter, setPriceFilter] = useState<string>("");
 
-  // All categories for dropdown
-  const allCategories = [
+  // Kategori
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string>("all"); // single main category
+  const [onlyFeatured, setOnlyFeatured] = useState(false);
+  const [onlyHalal, setOnlyHalal] = useState(false);
+
+  // Data & pagination
+  const PAGE_SIZE = 8;
+  const [items, setItems] = useState<UiKios[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const firstLoadRef = useRef(true);
+
+  // Ambil daftar kategori unik dari Firestore (sekali di awal)
+  useEffect(() => {
+    (async () => {
+      const snap = await getDocs(query(collection(db, "kios"), limit(200)));
+      const set = new Set<string>();
+      snap.forEach((doc) => {
+        const k = (doc.data() as FireKios)["Kategori"];
+        if (Array.isArray(k)) k.forEach((x) => x && set.add(x));
+        else if (typeof k === "string" && k) set.add(k);
+      });
+      // fallback kalau kosong
+      const base = [
+        "Makanan",
+        "Minuman",
+        "Cemilan",
+        "Kopi",
+        "Nusantara",
+        "Dessert",
+        "Pizza",
+        "Seafood",
+      ];
+      setAllCategories(Array.from(set).length ? Array.from(set) : base);
+    })().catch(console.error);
+  }, []);
+
+  // Build query sesuai filter
+  // const buildBaseQuery = (): Query<FireKios> => {
+  //   const col = collection(db, "kios") as CollectionReference<FireKios>;
+
+  //   let qRef: Query<FireKios> = query(col, orderBy("Rating", "desc"));
+
+  //   // kategori utama
+  //   if (selected !== "all") {
+  //     qRef = query(
+  //       col,
+  //       where("Kategori", "in", [selected]),
+  //       orderBy("Rating", "desc")
+  //     );
+  //   }
+
+  //   // halal / featured
+  //   const wheres: ReturnType<typeof where>[] = [];
+  //   if (onlyHalal) wheres.push(where("Halal", "==", true));
+  //   if (onlyFeatured) wheres.push(where("Pilihan Kami", "==", true));
+
+  //   if (wheres.length > 0) {
+  //     // hanya halal/featured
+  //     qRef = query(col, ...wheres, orderBy("Rating", "desc"));
+
+  //     // kategori + halal/featured
+  //     if (selected !== "all") {
+  //       qRef = query(
+  //         col,
+  //         where("Kategori", "in", [selected]),
+  //         ...wheres,
+  //         orderBy("Rating", "desc")
+  //       );
+  //     }
+  //   }
+
+  //   return qRef;
+  // };
+
+  const clearFilters = () => {
+    setOnlyFeatured(false);
+    setOnlyHalal(false);
+    setSelected("all");
+  };
+
+  const applyFilter = (all: UiKios[]): UiKios[] => {
+    const filtered = [...all];
+
+    // PILIHAN KAMI
+    if (onlyFeatured) {
+      return filtered
+        .filter((x) => x.isPilihanKami)
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 10);
+    }
+
+    // HALAL
+    if (onlyHalal) {
+      return filtered
+        .filter((x) => x.isHalal)
+        .sort((a, b) => b.rating - a.rating);
+    }
+
+    // KATEGORI
+    if (selected !== "all") {
+      const keywords = CATEGORY_MAP[selected] || [];
+
+      return filtered.filter((x) => {
+        const cat = x.categories.toLowerCase();
+        return keywords.some((k) => cat.includes(k));
+      });
+    }
+
+    // DEFAULT - semua
+    return filtered.sort((a, b) => b.rating - a.rating);
+  };
+
+  // Fetch pertama / saat filter berubah
+  const fetchFirstPage = async () => {
+    setLoading(true);
+    try {
+      const all = await fetchAllKios();
+
+      const result = applyFilter(all);
+
+      const firstPage = result.slice(0, PAGE_SIZE);
+      setItems(firstPage);
+
+      setCursor(firstPage.length);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAwningColor = (k: UiKios) => {
+    if (onlyFeatured) return "yellow";
+    if (selected === "all") return k.isPilihanKami ? "yellow" : "red";
+    return "red";
+  };
+
+  // Load more
+  const fetchNextPage = async () => {
+    if (cursor === null) return;
+
+    setLoadingMore(true);
+
+    try {
+      const all = await fetchAllKios();
+
+      // filter kategori
+      let filtered = all;
+
+      if (selected !== "all") {
+        const keywords = CATEGORY_MAP[selected] || [];
+        filtered = filtered.filter((x) => {
+          const cat = x.categories.toLowerCase();
+          return keywords.some((k) => cat.includes(k));
+        });
+      }
+
+      if (onlyHalal) filtered = filtered.filter((x) => x.isHalal);
+      if (onlyFeatured) filtered = filtered.filter((x) => x.isPilihanKami);
+
+      filtered = filtered.sort((a, b) => b.rating - a.rating);
+
+      const nextItems = filtered.slice(cursor, cursor + PAGE_SIZE);
+
+      setItems((prev) => [...prev, ...nextItems]);
+
+      // update cursor
+      if (nextItems.length < PAGE_SIZE) {
+        setCursor(null); // tidak ada data lagi
+      } else {
+        setCursor(cursor + PAGE_SIZE);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Trigger fetch saat kategori/flag berubah
+  useEffect(() => {
+    // hindari double-run pada strict mode
+    if (firstLoadRef.current) {
+      firstLoadRef.current = false;
+    }
+    fetchFirstPage().catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, onlyFeatured, onlyHalal]);
+
+  // Search lokal (client-side) untuk nama/alamat—cukup ringan
+  const filtered = useMemo(() => {
+    const nameQ = umkmSearch.trim().toLowerCase();
+    const locQ = locationSearch.trim().toLowerCase();
+    return items.filter((x) => {
+      const okName = !nameQ || x.name.toLowerCase().includes(nameQ);
+      const okLoc = !locQ || x.location.toLowerCase().includes(locQ);
+      return okName && okLoc;
+    });
+  }, [items, umkmSearch, locationSearch]);
+
+  // Kumpulan chip kategori “fixed” (ikon)
+  const chipDefs = [
     {
       id: "all",
       label: "Tampilkan Semua",
       icon: faUtensils,
       iconColor: semanticColors.textPrimary,
     },
-    {
-      id: "featured",
-      label: "Pilihan Kami",
-      icon: null,
-      iconColor: colors.secondary[500],
-      useCheckBadge: true,
-    }, // Uses CheckBadgeIcon
-    {
-      id: "halal",
-      label: "Halal",
-      icon: null,
-      iconColor: undefined,
-      useHalalIcon: true,
-    },
+    { id: "featured", label: "Pilihan Kami", special: "featured" as const },
+    { id: "halal", label: "Halal", special: "halal" as const },
     { id: "food", label: "Makanan", icon: faUtensils, iconColor: "#FF6B35" },
     { id: "drinks", label: "Minuman", icon: faMugHot, iconColor: "#4A90E2" },
     { id: "snacks", label: "Cemilan", icon: faCookie, iconColor: "#D2691E" },
@@ -106,402 +492,31 @@ export default function LandingPage({
       icon: faBowlRice,
       iconColor: semanticColors.textPrimary,
     },
-    { id: "dessert", label: "Dessert", icon: faIceCream, iconColor: "#FF69B4" }, // Pink
-    { id: "diet", label: "Diet", icon: faLeaf, iconColor: "#90EE90" }, // Light Green
-    { id: "pedas", label: "Pedas", icon: faPepperHot, iconColor: "#FF4500" }, // Red Orange
+    { id: "dessert", label: "Dessert", icon: faIceCream, iconColor: "#FF69B4" },
+    { id: "pizza", label: "Pizza", icon: faPizzaSlice, iconColor: "#90EE90" },
+    {
+      id: "seafood",
+      label: "Seafood",
+      icon: faFish,
+      iconColor: "#FF4500",
+    },
   ];
 
-  const [locationSearch, setLocationSearch] = useState("");
-  const [umkmSearch, setUmkmSearch] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([
-    "all",
-  ]);
-  const [lihatSemuaDropdown, setLihatSemuaDropdown] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<string>("");
-  const [priceFilter, setPriceFilter] = useState<string>("");
-  const [kiosData, setKiosData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const lihatSemuaRef = useRef<HTMLDivElement>(null);
+  // UI chips scroll
   const chipsContainerRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        lihatSemuaRef.current &&
-        !lihatSemuaRef.current.contains(event.target as Node)
-      ) {
-        setLihatSemuaDropdown(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  // Load kios data from Firestore
-  useEffect(() => {
-    const fetchKiosData = async () => {
-      try {
-        const q = query(collection(db, "kios"), orderBy("rating", "desc"));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const kiosList = querySnapshot.docs.map((doc, index) => {
-            const data = doc.data();
-            // Determine image based on category
-            let categoryImage =
-              "https://images.unsplash.com/photo-1634871572365-8bc444e6faea?w=574&h=386&fit=crop&q=80&auto=format";
-            if (data["Kategori"] && typeof data["Kategori"] === "string") {
-              const categoryLower = data["Kategori"].toLowerCase();
-              if (categoryLower.includes("ayam")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (categoryLower.includes("pizza")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (categoryLower.includes("nasi")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1606755965493-7b6435c7c2e5?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (categoryLower.includes("seafood")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (categoryLower.includes("bakso")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (categoryLower.includes("sate")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1645696301019-35adcc18fc21?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (
-                categoryLower.includes("mie") ||
-                categoryLower.includes("mie")
-              ) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1622343147636-106f278303b4?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (
-                categoryLower.includes("kopi") ||
-                categoryLower.includes("coffee")
-              ) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1624888465876-072fd1e0d3c7?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (
-                categoryLower.includes("jus") ||
-                categoryLower.includes("buah")
-              ) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1598679045187-2b0e6fff7f22?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (
-                categoryLower.includes("bakar") ||
-                categoryLower.includes("grill")
-              ) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1568640347023-a616a30bc3bd?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (
-                categoryLower.includes("kuah") ||
-                categoryLower.includes("soto") ||
-                categoryLower.includes("sop")
-              ) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1585297643353-563d08671c69?w=574&h=386&fit=crop&q=80&auto=format";
-              } else if (categoryLower.includes("goreng")) {
-                categoryImage =
-                  "https://images.unsplash.com/photo-1606755962588-9a4e3caffda3?w=574&h=386&fit=crop&q=80&auto=format";
-              }
-            }
-
-            return {
-              id: index + 1,
-              image: categoryImage,
-              name: data["Nama UMKM"] || "Nama UMKM tidak tersedia",
-              description:
-                data["Deskripsi UMKM"] ||
-                `Tentang ${data["Nama UMKM"] || "UMKM"}`,
-              categories: data["Kategori"] || "Makanan",
-              location: data["Alamat"]
-                ? data["Alamat"].split(",")[0]
-                : "Indonesia", // Ambil bagian pertama alamat
-              rating: parseFloat(data["Rating"]) || 0,
-              operatingHours: data["Jam Operasional"] || "08:00 - 20:00",
-              isPilihanKami: data["Pilihan Kami"] || false,
-              isHalal: data["Halal"] || false,
-            };
-          });
-
-          setKiosData(kiosList);
-        } else {
-          // Jika tidak ada dokumen ditemukan, gunakan data dummy
-          setKiosData([
-            {
-              id: 1,
-              image:
-                "https://images.unsplash.com/photo-1592011432621-f7f576f44484?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8YXlhbSUyMGJha2FyfGVufDB8fDB8fHww&auto=format&fit=crop&q=60&w=600",
-              name: "Ayam Bakar Khas Bandung Teteh Vivi",
-              description:
-                "Ayam bakar khas Bandung teteh Vivi menyajikan ayam bakar yang lezat dan nikmat",
-              categories: "Makanan, Nusantara",
-              location: "Depok",
-              rating: 4.6,
-              operatingHours: "17:00 - 22:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 2,
-              image:
-                "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Kedai Salad Sehat",
-              description:
-                "Kedai sehat yang fokus menyajikan makanan bergizi dan rendah kalori. Tempat favorit bagi yang ingin menjaga pola makan sehat tanpa mengorbankan rasa.",
-              categories: "Makanan, Diet",
-              location: "Jakarta",
-              rating: 4.7,
-              operatingHours: "10:00 - 20:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 3,
-              image:
-                "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Pizzeria Italia Nusantara",
-              description:
-                "Restoran pizza dengan sentuhan lokal Indonesia. Menghadirkan pizza dengan topping unik yang menggabungkan cita rasa Italia dan Indonesia.",
-              categories: "Makanan",
-              location: "Bandung",
-              rating: 4.5,
-              operatingHours: "09:00 - 18:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 4,
-              image:
-                "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Toko Kue Premium",
-              description:
-                "Toko kue spesialis kue premium dan pastry berkualitas tinggi. Menggunakan bahan-bahan pilihan dan teknik pembuatan yang teliti untuk hasil yang sempurna.",
-              categories: "Dessert",
-              location: "Surabaya",
-              rating: 4.2,
-              operatingHours: "11:00 - 21:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 5,
-              image:
-                "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Cafe Brunch Favorit",
-              description:
-                "Cafe cozy yang terkenal dengan menu brunch dan breakfast yang lengkap. Suasana nyaman dan hangat, cocok untuk bersantai bersama keluarga atau teman.",
-              categories: "Dessert",
-              location: "Yogyakarta",
-              rating: 4.8,
-              operatingHours: "14:00 - 22:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 6,
-              image:
-                "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Ramen House Asia",
-              description:
-                "Restoran ramen autentik dengan berbagai varian ramen dari berbagai negara Asia. Kuah yang kaya rasa dan bahan-bahan segar setiap harinya.",
-              categories: "Makanan",
-              location: "Medan",
-              rating: 4.6,
-              operatingHours: "07:00 - 15:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 7,
-              image:
-                "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Burger Joint Klasik",
-              description:
-                "Tempat makan burger dengan konsep klasik Amerika. Burger dengan patty tebal, keju leleh, dan bahan-bahan segar yang membuat setiap gigitan memuaskan.",
-              categories: "Makanan",
-              location: "Denpasar",
-              rating: 4.9,
-              operatingHours: "12:00 - 22:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-            {
-              id: 8,
-              image:
-                "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=574&h=386&fit=crop&q=80&auto=format",
-              name: "Rumah Makan Nusantara",
-              description:
-                "Rumah makan yang menghadirkan berbagai hidangan nusantara dalam satu tempat. Dari ayam goreng, daging bakar, hingga urap sayuran, semua tersedia di sini.",
-              categories: "Makanan, Nusantara",
-              location: "Makassar",
-              rating: 4.3,
-              operatingHours: "11:00 - 23:00",
-              isPilihanKami: true,
-              isHalal: true,
-            },
-          ]);
-        }
-      } catch (error) {
-        console.error("Error fetching kios data: ", error);
-        // Fallback to sample data if there's an error
-        setKiosData([
-          {
-            id: 1,
-            image:
-              "https://images.unsplash.com/photo-1634871572365-8bc444e6faea?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Warung Sate Padang Pak Jawa",
-            description:
-              "Warung sate padang legendaris yang telah berdiri puluhan tahun. Menyajikan sate padang autentik dengan bumbu khas Minangkabau yang diwariskan turun-temurun.",
-            categories: "Makanan, Nusantara",
-            location: "Depok",
-            rating: 4.6,
-            operatingHours: "17:00 - 22:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 2,
-            image:
-              "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Kedai Salad Sehat",
-            description:
-              "Kedai sehat yang fokus menyajikan makanan bergizi dan rendah kalori. Tempat favorit bagi yang ingin menjaga pola makan sehat tanpa mengorbankan rasa.",
-            categories: "Makanan, Diet",
-            location: "Jakarta",
-            rating: 4.7,
-            operatingHours: "10:00 - 20:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 3,
-            image:
-              "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Pizzeria Italia Nusantara",
-            description:
-              "Restoran pizza dengan sentuhan lokal Indonesia. Menghadirkan pizza dengan topping unik yang menggabungkan cita rasa Italia dan Indonesia.",
-            categories: "Makanan",
-            location: "Bandung",
-            rating: 4.5,
-            operatingHours: "09:00 - 18:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 4,
-            image:
-              "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Toko Kue Premium",
-            description:
-              "Toko kue spesialis kue premium dan pastry berkualitas tinggi. Menggunakan bahan-bahan pilihan dan teknik pembuatan yang teliti untuk hasil yang sempurna.",
-            categories: "Dessert",
-            location: "Surabaya",
-            rating: 4.2,
-            operatingHours: "11:00 - 21:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 5,
-            image:
-              "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Cafe Brunch Favorit",
-            description:
-              "Cafe cozy yang terkenal dengan menu brunch dan breakfast yang lengkap. Suasana nyaman dan hangat, cocok untuk bersantai bersama keluarga atau teman.",
-            categories: "Dessert",
-            location: "Yogyakarta",
-            rating: 4.8,
-            operatingHours: "14:00 - 22:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 6,
-            image:
-              "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Ramen House Asia",
-            description:
-              "Restoran ramen autentik dengan berbagai varian ramen dari berbagai negara Asia. Kuah yang kaya rasa dan bahan-bahan segar setiap harinya.",
-            categories: "Makanan",
-            location: "Medan",
-            rating: 4.6,
-            operatingHours: "07:00 - 15:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 7,
-            image:
-              "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Burger Joint Klasik",
-            description:
-              "Tempat makan burger dengan konsep klasik Amerika. Burger dengan patty tebal, keju leleh, dan bahan-bahan segar yang membuat setiap gigitan memuaskan.",
-            categories: "Makanan",
-            location: "Denpasar",
-            rating: 4.9,
-            operatingHours: "12:00 - 22:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-          {
-            id: 8,
-            image:
-              "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=574&h=386&fit=crop&q=80&auto=format",
-            name: "Rumah Makan Nusantara",
-            description:
-              "Rumah makan yang menghadirkan berbagai hidangan nusantara dalam satu tempat. Dari ayam goreng, daging bakar, hingga urap sayuran, semua tersedia di sini.",
-            categories: "Makanan, Nusantara",
-            location: "Makassar",
-            rating: 4.3,
-            operatingHours: "11:00 - 23:00",
-            isPilihanKami: true,
-            isHalal: true,
-          },
-        ]);
-      } finally {
-        // Pastikan loading state berubah menjadi false setelah selesai
-        setLoading(false);
-      }
-    };
-
-    fetchKiosData();
-  }, []);
-
-  // Handle category selection
-  const handleCategoryClick = (categoryId: string) => {
-    if (categoryId === "all") {
-      // "Tampilkan Semua" is exclusive - only select it
-      setSelectedCategories(["all"]);
-    } else {
-      // Other categories can be selected together
-      // If "all" is selected, remove it first
-      const newSelection = selectedCategories.includes("all")
-        ? [categoryId]
-        : selectedCategories.includes(categoryId)
-        ? selectedCategories.filter((id) => id !== categoryId) // Toggle off
-        : [...selectedCategories.filter((id) => id !== "all"), categoryId]; // Toggle on
-
-      setSelectedCategories(newSelection.length > 0 ? newSelection : ["all"]);
-    }
-  };
-
+  // ————————————————— UI
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: colors.neutral[3] }}
     >
-      {/* Header / Navigation */}
       <Header
         onNavigateToLogin={onNavigateToLogin}
         onNavigateToSignUp={onNavigateToSignUp}
-        onNavigateToHome={() => {}} // Landing page is home, so no-op
-        onNavigateToDetailKios={onNavigateToDetailKios}
-        showSearch={true}
+        onNavigateToHome={() => {}}
+        onNavigateToDetailKios={() => {}}
+        showSearch
         locationSearch={locationSearch}
         onLocationSearchChange={setLocationSearch}
         umkmSearch={umkmSearch}
@@ -510,405 +525,241 @@ export default function LandingPage({
         onTimeFilterChange={setTimeFilter}
         priceFilter={priceFilter}
         onPriceFilterChange={setPriceFilter}
+        userProfile={
+          isLoggedIn
+            ? {
+                name: "User",
+                imageUrl: "https://i.pravatar.cc/100",
+                onClick: () => {},
+                onSettingsClick: () => onNavigateToDetailKios("settings"),
+                onLogoutClick: () => {
+                  localStorage.removeItem("isLoggedIn");
+                  window.location.reload();
+                },
+              }
+            : undefined
+        }
       />
 
-      {/* Hero Banner */}
+      {/* Banner */}
       <section className="px-4 sm:px-6 lg:px-20 py-6">
         <div className="max-w-[1440px] mx-auto">
-          {!loading && kiosData.length > 0 && (
-            <Banner
-              image={
-                kiosData[0]?.image ||
-                "https://images.unsplash.com/photo-1634871572365-8bc444e6faea?w=1920&h=650&fit=crop&q=80&auto=format"
-              }
-              title={kiosData[0]?.name || "Warung Sate Padang Pak Jawa"}
-              description={
-                kiosData[0]?.description ||
-                "Warung sate padang legendaris yang telah berdiri puluhan tahun. Menyajikan sate padang autentik dengan bumbu khas Minangkabau yang diwariskan turun-temurun."
-              }
-              isPilihanKami={kiosData[0]?.isPilihanKami || true}
-              onViewClick={onNavigateToDetailKios}
-            />
-          )}
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <p
-                className="font-dm-sans font-regular text-lg"
-                style={{ color: semanticColors.textPrimary }}
-              >
-                Loading...
-              </p>
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <p style={{ color: semanticColors.textPrimary }}>Loading…</p>
             </div>
-          )}
-          {!loading && kiosData.length === 0 && (
+          ) : filtered.length > 0 ? (
+            <Banner
+              image={filtered[0].placeImage}
+              title={filtered[0].name}
+              description={`${
+                filtered[0].description
+              } — Harga mulai dari Rp${filtered[0].price.toLocaleString()}`}
+              isPilihanKami={filtered[0].isPilihanKami}
+              onViewClick={() => onNavigateToDetailKios(filtered[0].id)}
+            />
+          ) : (
             <Banner
               image="https://images.unsplash.com/photo-1634871572365-8bc444e6faea?w=1920&h=650&fit=crop&q=80&auto=format"
-              title="Warung Sate Padang Pak Jawa"
-              description="Warung sate padang legendaris yang telah berdiri puluhan tahun. Menyajikan sate padang autentik dengan bumbu khas Minangkabau yang diwariskan turun-temurun."
-              isPilihanKami={true}
-              onViewClick={onNavigateToDetailKios}
+              title="UMKM tidak ditemukan"
+              description="Coba ubah filter kategori atau pencarian."
+              isPilihanKami={false}
+              onViewClick={() => {}}
             />
           )}
         </div>
       </section>
 
-      {/* Category Filters */}
+      {/* Chips + Filter */}
       <section
         className="px-4 sm:px-6 lg:px-20 py-0 lg:py-3"
         style={{ backgroundColor: colors.neutral[3] }}
       >
-        <div className="max-w-[1440px] mx-auto">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-2 sm:gap-4 lg:pb-2 pb-0">
-            {/* Mobile: Only dropdowns */}
-            <div className="flex lg:hidden gap-2 sm:gap-4">
-              {/* Jenis Produk Dropdown Button (Mobile) */}
-              <div className="relative flex-1" ref={lihatSemuaRef}>
-                <button
-                  className="flex items-center justify-between gap-[10px] px-3 py-2 rounded-[12px] h-[39px] cursor-pointer transition-colors whitespace-nowrap w-full"
-                  style={{
-                    backgroundColor: semanticColors.bgDark,
-                    color: semanticColors.textOnDark,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-                  onClick={() => {
-                    setLihatSemuaDropdown(!lihatSemuaDropdown);
-                  }}
-                >
-                  <span className="font-dm-sans font-regular text-sm">
-                    Jenis Produk
-                  </span>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    className={`w-4 h-4 transition-transform ${
-                      lihatSemuaDropdown ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Jenis Produk Dropdown */}
-                {lihatSemuaDropdown && (
-                  <div
-                    className="absolute top-full left-0 mt-2 w-[280px] rounded-[12px] p-4 z-50 shadow-lg"
-                    style={{ backgroundColor: semanticColors.bgPrimary }}
+        <div className="max-w-[1440px] mx-auto flex gap-4 items-center">
+          <div
+            ref={chipsContainerRef}
+            className="flex gap-4 flex-1 min-w-0 overflow-x-auto scrollbar-hide scroll-smooth flex-nowrap"
+            style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
+          >
+            {/* Kategori fixed */}
+            {chipDefs.map((c) => {
+              // PILIHAN KAMI
+              if (c.special === "featured") {
+                return (
+                  <ChipSelector
+                    key="featured"
+                    icon={
+                      <CheckBadgeIcon width={20} height={20} color="#facc15" />
+                    }
+                    isSelected={onlyFeatured}
+                    onClick={() => {
+                      setOnlyFeatured((v) => {
+                        const newVal = !v;
+                        if (newVal) {
+                          setOnlyHalal(false);
+                          setSelected("all");
+                        }
+                        return newVal;
+                      });
+                    }}
                   >
-                    <div className="flex flex-col gap-3">
-                      {allCategories.map((cat) => (
-                        <label
-                          key={cat.id}
-                          className="flex items-center gap-3 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedCategories.includes(cat.id)}
-                            onChange={() => handleCategoryClick(cat.id)}
-                            className="w-4 h-4 cursor-pointer"
-                            style={{ accentColor: semanticColors.bgDark }}
-                          />
-                          <div className="flex items-center gap-2">
-                            {cat.useHalalIcon ? (
-                              <HalalIcon width={16} height={16} />
-                            ) : cat.useCheckBadge ? (
-                              <CheckBadgeIcon
-                                width={16}
-                                height={16}
-                                color={
-                                  cat.iconColor || semanticColors.textPrimary
-                                }
-                              />
-                            ) : cat.icon ? (
-                              <FontAwesomeIcon
-                                icon={cat.icon}
-                                className="w-4 h-4"
-                                style={{ color: cat.iconColor }}
-                              />
-                            ) : null}
-                            <span
-                              className="font-dm-sans font-regular text-sm"
-                              style={{ color: semanticColors.textPrimary }}
-                            >
-                              {cat.label}
-                            </span>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                    Pilihan Kami
+                  </ChipSelector>
+                );
+              }
 
-              {/* Filter Dropdown Button (Mobile) */}
-              <div className="flex-1">
-                <FilterDropdown
-                  label="Filter"
-                  timeFilter={timeFilter}
-                  priceFilter={priceFilter}
-                  onTimeFilterChange={setTimeFilter}
-                  onPriceFilterChange={setPriceFilter}
-                  className="w-full"
-                />
-              </div>
-            </div>
+              // HALAL
+              if (c.special === "halal") {
+                return (
+                  <ChipSelector
+                    key="halal"
+                    icon={<HalalIcon width={20} height={20} />}
+                    isSelected={onlyHalal}
+                    onClick={() => {
+                      setOnlyHalal((v) => {
+                        const newVal = !v;
+                        if (newVal) {
+                          setOnlyFeatured(false);
+                          setSelected("all");
+                        }
+                        return newVal;
+                      });
+                    }}
+                  >
+                    Halal
+                  </ChipSelector>
+                );
+              }
 
-            {/* Desktop: Chips on left, dropdowns on right */}
-            <div
-              ref={chipsContainerRef}
-              className="hidden lg:flex gap-4 flex-1 min-w-0 overflow-x-auto scrollbar-hide scroll-smooth flex-nowrap"
-              style={{
-                touchAction: "pan-x",
-                WebkitOverflowScrolling: "touch",
-                cursor: "grab",
-              }}
-              onMouseDown={(e) => {
-                const container = chipsContainerRef.current;
-                if (!container) return;
-
-                const startX = e.pageX;
-                let currentScroll = container.scrollLeft;
-                container.style.cursor = "grabbing";
-                let lastX = startX;
-                let velocity = 0;
-                let lastTime = Date.now();
-                let rafId: number | null = null;
-
-                const onMouseMove = (e: MouseEvent) => {
-                  const currentTime = Date.now();
-                  const timeDelta = Math.max(currentTime - lastTime, 1);
-                  const currentVelocity = (e.pageX - lastX) / timeDelta;
-
-                  velocity = currentVelocity * 0.3 + velocity * 0.7; // Smooth velocity with exponential moving average
-                  lastX = e.pageX;
-                  lastTime = currentTime;
-
-                  // Use requestAnimationFrame for smooth updates
-                  if (!rafId) {
-                    rafId = requestAnimationFrame(() => {
-                      const diffX = lastX - startX;
-                      container.scrollLeft = currentScroll - diffX;
-                      rafId = null;
-                    });
-                  }
-
-                  e.preventDefault();
-                };
-
-                const onMouseUp = () => {
-                  container.style.cursor = "grab";
-                  document.removeEventListener("mousemove", onMouseMove);
-                  document.removeEventListener("mouseup", onMouseUp);
-
-                  if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
-                  }
-
-                  // Update current scroll position
-                  currentScroll = container.scrollLeft;
-
-                  // Add momentum scrolling
-                  if (Math.abs(velocity) > 0.1) {
-                    const momentum = velocity * 20; // Momentum multiplier
-                    const targetScroll = currentScroll - momentum;
-                    const startScroll = currentScroll;
-                    const distance = targetScroll - startScroll;
-                    const duration = 400; // ms
-                    const startTime = Date.now();
-
-                    const easeOut = (t: number) => {
-                      return 1 - Math.pow(1 - t, 3); // Cubic ease-out
-                    };
-
-                    const animateMomentum = () => {
-                      const elapsed = Date.now() - startTime;
-                      const progress = Math.min(elapsed / duration, 1);
-                      const eased = easeOut(progress);
-
-                      currentScroll = startScroll + distance * eased;
-                      container.scrollLeft = currentScroll;
-
-                      if (progress < 1) {
-                        requestAnimationFrame(animateMomentum);
-                      }
-                    };
-
-                    requestAnimationFrame(animateMomentum);
-                  }
-                };
-
-                document.addEventListener("mousemove", onMouseMove);
-                document.addEventListener("mouseup", onMouseUp);
-              }}
-            >
-              {categories.map((cat) => (
-                <ChipSelector
-                  key={cat.id}
-                  icon={
-                    cat.useHalalIcon ? (
-                      <HalalIcon width={20} height={20} />
-                    ) : cat.useCheckBadge ? (
-                      <CheckBadgeIcon
-                        width={20}
-                        height={20}
-                        color={cat.iconColor || semanticColors.textPrimary}
+              // TAMPILKAN SEMUA
+              if (c.id === "all") {
+                return (
+                  <ChipSelector
+                    key="all"
+                    icon={
+                      <FontAwesomeIcon
+                        icon={faUtensils}
+                        style={{ color: "#2563eb" }}
                       />
-                    ) : cat.icon ? (
-                      <FontAwesomeIcon icon={cat.icon} className="w-5 h-5" />
+                    }
+                    isSelected={
+                      selected === "all" && !onlyHalal && !onlyFeatured
+                    }
+                    onClick={clearFilters}
+                  >
+                    Tampilkan Semua
+                  </ChipSelector>
+                );
+              }
+
+              // KATEGORI
+              return (
+                <ChipSelector
+                  key={c.id}
+                  icon={
+                    c.icon ? (
+                      <FontAwesomeIcon
+                        icon={c.icon}
+                        className="w-5 h-5"
+                        style={{ color: c.iconColor || "#444" }}
+                      />
                     ) : null
                   }
-                  iconColor={cat.iconColor}
-                  isSelected={selectedCategories.includes(cat.id)}
-                  onClick={() => handleCategoryClick(cat.id)}
+                  isSelected={selected === c.label}
+                  onClick={() => {
+                    setSelected(c.label);
+                    setOnlyFeatured(false);
+                    setOnlyHalal(false);
+                  }}
+                >
+                  {c.label}
+                </ChipSelector>
+              );
+            })}
+
+            {/* Kategori dinamis dari Firestore (kalau ada yang tidak ada di list di atas) */}
+            {allCategories
+              .filter((k) => !chipDefs.some((d) => d.label === k))
+              .map((k) => (
+                <ChipSelector
+                  key={k}
+                  icon={
+                    <FontAwesomeIcon
+                      icon={getIconForCategory(k)}
+                      className="w-5 h-5"
+                    />
+                  }
+                  isSelected={selected === k}
+                  onClick={() => {
+                    setSelected(k);
+                    setOnlyFeatured(false);
+                    setOnlyHalal(false);
+                  }}
                   className="shrink-0"
                 >
-                  {cat.label}
+                  {k}
                 </ChipSelector>
               ))}
-            </div>
+          </div>
 
-            {/* Desktop: Lihat Semua & Filter on right - Hug content */}
-            <div className="hidden lg:flex gap-4 items-center shrink-0">
-              {/* Lihat Semua Dropdown Button (Desktop) */}
-              <div className="relative" ref={lihatSemuaRef}>
-                <button
-                  className="flex items-center gap-[10px] px-3 py-2 rounded-[12px] h-[39px] cursor-pointer transition-colors whitespace-nowrap"
-                  style={{
-                    backgroundColor: semanticColors.bgDark,
-                    color: semanticColors.textOnDark,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-                  onClick={() => {
-                    setLihatSemuaDropdown(!lihatSemuaDropdown);
-                  }}
-                >
-                  <span className="font-dm-sans font-regular text-sm">
-                    Lihat Semua
-                  </span>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    className={`w-4 h-4 transition-transform ${
-                      lihatSemuaDropdown ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Lihat Semua Dropdown */}
-                {lihatSemuaDropdown && (
-                  <div
-                    className="absolute top-full right-0 mt-2 w-[280px] rounded-[12px] p-4 z-50 shadow-lg"
-                    style={{ backgroundColor: semanticColors.bgPrimary }}
-                  >
-                    <div className="flex flex-col gap-3">
-                      {allCategories.map((cat) => (
-                        <label
-                          key={cat.id}
-                          className="flex items-center gap-3 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedCategories.includes(cat.id)}
-                            onChange={() => handleCategoryClick(cat.id)}
-                            className="w-4 h-4 cursor-pointer"
-                            style={{ accentColor: semanticColors.bgDark }}
-                          />
-                          <div className="flex items-center gap-2">
-                            {cat.useHalalIcon ? (
-                              <HalalIcon width={16} height={16} />
-                            ) : cat.useCheckBadge ? (
-                              <CheckBadgeIcon
-                                width={16}
-                                height={16}
-                                color={
-                                  cat.iconColor || semanticColors.textPrimary
-                                }
-                              />
-                            ) : cat.icon ? (
-                              <FontAwesomeIcon
-                                icon={cat.icon}
-                                className="w-4 h-4"
-                                style={{ color: cat.iconColor }}
-                              />
-                            ) : null}
-                            <span
-                              className="font-dm-sans font-regular text-sm"
-                              style={{ color: semanticColors.textPrimary }}
-                            >
-                              {cat.label}
-                            </span>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Filter Dropdown Button (Desktop) */}
-              <div>
-                <FilterDropdown
-                  label="Filter"
-                  timeFilter={timeFilter}
-                  priceFilter={priceFilter}
-                  onTimeFilterChange={setTimeFilter}
-                  onPriceFilterChange={setPriceFilter}
-                />
-              </div>
-            </div>
+          <div className="hidden lg:flex items-center gap-3">
+            <FilterDropdown
+              label="Filter"
+              timeFilter={timeFilter}
+              priceFilter={priceFilter}
+              onTimeFilterChange={setTimeFilter}
+              onPriceFilterChange={setPriceFilter}
+            />
           </div>
         </div>
       </section>
 
-      {/* Kios Grid */}
+      {/* Grid */}
       <section className="px-4 sm:px-6 lg:px-20 py-6 flex-1">
         <div className="max-w-[1440px] mx-auto">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <p
-                className="font-dm-sans font-regular text-lg"
-                style={{ color: semanticColors.textPrimary }}
-              >
-                Loading...
-              </p>
+            <div className="flex justify-center py-16">
+              <p style={{ color: semanticColors.textPrimary }}>Memuat data…</p>
             </div>
-          ) : kiosData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <p
-                className="font-dm-sans font-regular text-lg"
-                style={{ color: semanticColors.textPrimary }}
-              >
-                Tidak ada data kios ditemukan
+          ) : filtered.length === 0 ? (
+            <div className="flex justify-center py-16">
+              <p style={{ color: semanticColors.textPrimary }}>
+                Tidak ada data kios
               </p>
             </div>
           ) : (
             <>
-              {/* Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[30px] mb-8">
-                {kiosData.map((kios, index) => (
-                  <KiosCard
-                    key={kios.id}
-                    image={kios.image}
-                    name={kios.name}
-                    categories={kios.categories}
-                    description={kios.description}
-                    location={kios.location}
-                    rating={kios.rating}
-                    operatingHours={kios.operatingHours}
-                    isPilihanKami={kios.isPilihanKami}
-                    isHalal={kios.isHalal}
-                    onClick={
-                      index === 0
-                        ? onNavigateToDetailKios
-                        : () => console.log("View kios", kios.id)
-                    }
-                  />
-                ))}
+                {filtered.map((k) => {
+                  const showHalalStatus =
+                    (selected === "all" || onlyHalal) && k.isHalal;
+
+                  return (
+                    <KiosCard
+                      key={k.id}
+                      image={k.placeImage}
+                      name={k.name}
+                      categories={k.categories}
+                      description={k.description}
+                      location={k.location}
+                      rating={k.rating}
+                      operatingHours={k.operatingHours}
+                      isPilihanKami={k.isPilihanKami}
+                      isHalal={showHalalStatus}
+                      awningColor={getAwningColor(k)}
+                      price={k.price}
+                      onClick={() => onNavigateToDetailKios(k.id)}
+                    />
+                  );
+                })}
               </div>
 
-              {/* Load More Button */}
+              {/* Load more */}
               <div className="flex justify-center">
                 <Button
                   variant="primary"
-                  onClick={() => console.log("Load more")}
+                  disabled={!cursor || loadingMore}
+                  onClick={fetchNextPage}
                   rightIcon={
                     <FontAwesomeIcon
                       icon={faChevronRight}
@@ -917,7 +768,11 @@ export default function LandingPage({
                   }
                   className="px-8"
                 >
-                  Tampilkan lebih Banyak
+                  {loadingMore
+                    ? "Memuat..."
+                    : cursor
+                    ? "Tampilkan lebih Banyak"
+                    : "Sudah tampil semua"}
                 </Button>
               </div>
             </>
@@ -925,7 +780,6 @@ export default function LandingPage({
         </div>
       </section>
 
-      {/* Footer */}
       <Footer />
     </div>
   );

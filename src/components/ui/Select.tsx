@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import type { ReactNode } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import { semanticColors } from '../../styles/colors';
+import { useState, useRef, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { semanticColors } from "../../styles/colors";
 
 interface SelectProps {
   value: string;
@@ -16,37 +15,40 @@ export default function Select({
   value,
   onChange,
   options,
-  placeholder = 'Select...',
-  className = '',
+  placeholder = "Select...",
+  className = "",
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+      if (
+        selectRef.current &&
+        !selectRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen]);
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find((opt) => opt.value === value);
   const displayValue = selectedOption ? selectedOption.label : placeholder;
-  const hasValue = value !== '';
+  const hasValue = value !== "";
 
   // Determine width class based on className
   const getWidthClass = () => {
-    if (className.includes('w-full')) return 'w-full';
-    if (className.includes('flex-1')) return 'flex-1';
-    return 'w-[296px]';
+    if (className.includes("w-full")) return "w-full";
+    if (className.includes("flex-1")) return "flex-1";
+    return "w-[296px]";
   };
 
   return (
@@ -56,19 +58,33 @@ export default function Select({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center justify-between gap-[10px] h-[39px] px-3 py-[6px] rounded-[12px] w-full cursor-pointer transition-colors ${className}`}
         style={{ backgroundColor: semanticColors.bgTertiary }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgSecondary}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundColor = semanticColors.bgSecondary)
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.backgroundColor = semanticColors.bgTertiary)
+        }
       >
         <span
           className="font-dm-sans font-regular text-sm flex-1 text-left"
-          style={{ color: hasValue ? semanticColors.bgDark : semanticColors.textSecondary }}
+          style={{
+            color: hasValue
+              ? semanticColors.bgDark
+              : semanticColors.textSecondary,
+          }}
         >
           {displayValue}
         </span>
         <FontAwesomeIcon
           icon={faChevronDown}
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          style={{ color: hasValue ? semanticColors.bgDark : semanticColors.textSecondary }}
+          className={`w-4 h-4 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          style={{
+            color: hasValue
+              ? semanticColors.bgDark
+              : semanticColors.textSecondary,
+          }}
         />
       </button>
 
@@ -88,16 +104,20 @@ export default function Select({
               className="w-full text-left px-3 py-2 rounded-[8px] cursor-pointer transition-colors font-dm-sans font-regular text-sm"
               style={{
                 color: semanticColors.textPrimary,
-                backgroundColor: value === option.value ? semanticColors.bgSecondary : 'transparent',
+                backgroundColor:
+                  value === option.value
+                    ? semanticColors.bgSecondary
+                    : "transparent",
               }}
               onMouseEnter={(e) => {
                 if (value !== option.value) {
-                  e.currentTarget.style.backgroundColor = semanticColors.bgSecondary;
+                  e.currentTarget.style.backgroundColor =
+                    semanticColors.bgSecondary;
                 }
               }}
               onMouseLeave={(e) => {
                 if (value !== option.value) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.backgroundColor = "transparent";
                 }
               }}
             >
@@ -109,4 +129,3 @@ export default function Select({
     </div>
   );
 }
-
