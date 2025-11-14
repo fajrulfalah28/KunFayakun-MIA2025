@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import { semanticColors, colors } from '../../styles/colors';
+import { useEffect, useRef } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import { semanticColors, colors } from "../../styles/colors";
 
 export interface FavoriteProduct {
   id: string;
@@ -15,7 +15,7 @@ interface FavoritesModalProps {
   onClose: () => void;
   favorites: FavoriteProduct[];
   onRemoveFavorite: (id: string) => void;
-  onNavigateToDetailKios?: () => void;
+  onNavigateToDetailKios?: (id: string) => void;
 }
 
 export default function FavoritesModal({
@@ -29,27 +29,30 @@ export default function FavoritesModal({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
     };
   }, [isOpen, onClose]);
 
@@ -58,7 +61,7 @@ export default function FavoritesModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
       onClick={onClose}
     >
       <div
@@ -68,10 +71,16 @@ export default function FavoritesModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b" style={{ borderColor: colors.neutral[6] }}>
+        <div
+          className="flex items-center justify-between p-4 sm:p-6 border-b"
+          style={{ borderColor: colors.neutral[6] }}
+        >
           <h2
             className="font-black text-xl sm:text-2xl"
-            style={{ fontFamily: "'Nunito', sans-serif", color: semanticColors.textPrimary }}
+            style={{
+              fontFamily: "'Nunito', sans-serif",
+              color: semanticColors.textPrimary,
+            }}
           >
             Favorit Saya
           </h2>
@@ -82,10 +91,19 @@ export default function FavoritesModal({
             }}
             className="flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-colors shrink-0"
             style={{ backgroundColor: semanticColors.bgTertiary }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = colors.neutral[5])
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor =
+                semanticColors.bgTertiary)
+            }
           >
-            <FontAwesomeIcon icon={faTimes} className="w-4 h-4" style={{ color: semanticColors.textPrimary }} />
+            <FontAwesomeIcon
+              icon={faTimes}
+              className="w-4 h-4"
+              style={{ color: semanticColors.textPrimary }}
+            />
           </button>
         </div>
 
@@ -93,7 +111,10 @@ export default function FavoritesModal({
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {favorites.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <p className="font-dm-sans font-regular text-sm" style={{ color: semanticColors.textSecondary }}>
+              <p
+                className="font-dm-sans font-regular text-sm"
+                style={{ color: semanticColors.textSecondary }}
+              >
                 Belum ada produk favorit
               </p>
             </div>
@@ -104,15 +125,17 @@ export default function FavoritesModal({
                   e.stopPropagation();
                   // Don't navigate if clicking on the delete button
                   const target = e.target as HTMLElement;
-                  if (target.closest('button')) {
+                  if (target.closest("button")) {
                     return;
                   }
                   if (onNavigateToDetailKios) {
-                    console.log('Navigating to DetailKiosPage');
-                    onNavigateToDetailKios();
+                    console.log("Navigating to DetailKiosPage:", favorite.id);
+                    onNavigateToDetailKios(favorite.id);
                     onClose();
                   } else {
-                    console.warn('onNavigateToDetailKios is undefined in FavoritesModal');
+                    console.warn(
+                      "onNavigateToDetailKios is undefined in FavoritesModal"
+                    );
                   }
                 };
 
@@ -121,8 +144,14 @@ export default function FavoritesModal({
                     key={favorite.id}
                     className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-[12px] transition-colors cursor-pointer"
                     style={{ backgroundColor: semanticColors.bgSecondary }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[4]}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgSecondary}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        colors.neutral[4])
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        semanticColors.bgSecondary)
+                    }
                     onClick={handleItemClick}
                   >
                     {/* Product Image */}
@@ -158,10 +187,20 @@ export default function FavoritesModal({
                       }}
                       className="flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-colors shrink-0"
                       style={{ backgroundColor: semanticColors.bgTertiary }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor =
+                          colors.neutral[5])
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor =
+                          semanticColors.bgTertiary)
+                      }
                     >
-                      <FontAwesomeIcon icon={faTimes} className="w-4 h-4" style={{ color: semanticColors.textPrimary }} />
+                      <FontAwesomeIcon
+                        icon={faTimes}
+                        className="w-4 h-4"
+                        style={{ color: semanticColors.textPrimary }}
+                      />
                     </button>
                   </div>
                 );
@@ -173,4 +212,3 @@ export default function FavoritesModal({
     </div>
   );
 }
-

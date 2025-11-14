@@ -1,20 +1,28 @@
-import type { ReactNode } from 'react';
-import { useState, useEffect, useRef } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faHeart, faLocationDot, faSearch, faUser, faGear, faRightFromBracket, faTimes } from '@fortawesome/free-solid-svg-icons';
-import Button from '../ui/Button';
-import TextField from '../ui/TextField';
-import FilterDropdown from '../ui/FilterDropdown';
-import FavoritesModal from '../ui/FavoritesModal';
-import { useFavorites } from '../../contexts/FavoritesContext';
-import { semanticColors, brandColors, colors } from '../../styles/colors';
-import ShopIcon from '../icons/ShopIcon';
+import type { ReactNode } from "react";
+import { useState, useEffect, useRef } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHeart,
+  faLocationDot,
+  faSearch,
+  faUser,
+  faGear,
+  faRightFromBracket,
+  faTimes,
+} from "@fortawesome/free-solid-svg-icons";
+import Button from "../ui/Button";
+import TextField from "../ui/TextField";
+import FilterDropdown from "../ui/FilterDropdown";
+import FavoritesModal from "../ui/FavoritesModal";
+import { useFavorites } from "../../contexts/FavoritesContext";
+import { semanticColors, brandColors, colors } from "../../styles/colors";
+import ShopIcon from "../icons/ShopIcon";
 
 interface HeaderProps {
   onNavigateToLogin: () => void;
   onNavigateToSignUp: () => void;
   onNavigateToHome?: () => void;
-  onNavigateToDetailKios?: () => void;
+  onNavigateToDetailKios?: (id: string) => void;
   favoritesCount?: number; // Deprecated - kept for backward compatibility
   onFavoritesClick?: () => void;
   // Profile picture (if provided, shows profile instead of login/signup buttons)
@@ -47,13 +55,13 @@ export default function Header({
   onFavoritesClick,
   userProfile,
   showSearch = false,
-  locationSearch = '',
+  locationSearch = "",
   onLocationSearchChange,
-  umkmSearch = '',
+  umkmSearch = "",
   onUmkmSearchChange,
-  timeFilter = '',
+  timeFilter = "",
   onTimeFilterChange,
-  priceFilter = '',
+  priceFilter = "",
   onPriceFilterChange,
   centerContent,
 }: HeaderProps) {
@@ -74,12 +82,14 @@ export default function Header({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
-      
+
       // Check profile dropdown
       if (isProfileDropdownOpen) {
-        const mobileProfileDropdown = document.querySelector('[data-mobile-profile-dropdown]');
-        const profileButton = document.querySelector('[data-profile-button]');
-        
+        const mobileProfileDropdown = document.querySelector(
+          "[data-mobile-profile-dropdown]"
+        );
+        const profileButton = document.querySelector("[data-profile-button]");
+
         // Don't close if clicking inside dropdown or on profile button
         if (mobileProfileDropdown && mobileProfileDropdown.contains(target)) {
           return;
@@ -89,10 +99,13 @@ export default function Header({
         }
         setIsProfileDropdownOpen(false);
       }
-      
+
       // Check if click is outside mobile menu AND not on hamburger button
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(target)) {
-        if (hamburgerButtonRef.current && !hamburgerButtonRef.current.contains(target)) {
+        if (
+          hamburgerButtonRef.current &&
+          !hamburgerButtonRef.current.contains(target)
+        ) {
           setIsMobileMenuOpen(false);
         }
       }
@@ -100,17 +113,17 @@ export default function Header({
 
     if (isProfileDropdownOpen || isMobileMenuOpen) {
       // Use 'click' event which fires after button clicks complete
-      document.addEventListener('click', handleClickOutside);
-      document.addEventListener('touchend', handleClickOutside);
-      
+      document.addEventListener("click", handleClickOutside);
+      document.addEventListener("touchend", handleClickOutside);
+
       return () => {
-        document.removeEventListener('click', handleClickOutside);
-        document.removeEventListener('touchend', handleClickOutside);
+        document.removeEventListener("click", handleClickOutside);
+        document.removeEventListener("touchend", handleClickOutside);
       };
     }
   }, [isProfileDropdownOpen, isMobileMenuOpen]);
   return (
-    <header 
+    <header
       className="sticky top-0 z-50 py-4 sm:py-6 px-4 sm:px-6 lg:px-20"
       style={{ backgroundColor: colors.neutral[1] }}
     >
@@ -126,12 +139,15 @@ export default function Header({
             </div>
             <h1
               className="font-black text-2xl"
-              style={{ fontFamily: "'Nunito', sans-serif", color: semanticColors.textPrimary }}
+              style={{
+                fontFamily: "'Nunito', sans-serif",
+                color: semanticColors.textPrimary,
+              }}
             >
               KiosKu
             </h1>
           </button>
-          
+
           <div className="flex items-center gap-2">
             {/* Show Favorites & Profile if userProfile exists */}
             {userProfile && (
@@ -141,12 +157,18 @@ export default function Header({
                   <button
                     className="flex items-center justify-center p-2 rounded-full w-[39px] h-[39px] cursor-pointer transition-colors"
                     style={{ backgroundColor: semanticColors.bgTertiary }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        colors.neutral[5])
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        semanticColors.bgTertiary)
+                    }
                     onClick={handleFavoritesClick}
                   >
-                    <FontAwesomeIcon 
-                      icon={faHeart} 
+                    <FontAwesomeIcon
+                      icon={faHeart}
                       className="w-5 h-5"
                       style={{ color: brandColors.primary }}
                     />
@@ -165,9 +187,7 @@ export default function Header({
                 </div>
 
                 {/* Profile Picture */}
-                <div 
-                  className="relative" 
-                >
+                <div className="relative">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -176,25 +196,31 @@ export default function Header({
                     data-profile-button
                     className="flex items-center justify-center rounded-full w-[39px] h-[39px] cursor-pointer transition-colors overflow-hidden"
                     style={{ backgroundColor: semanticColors.bgTertiary }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
-                    aria-label={userProfile.name || 'Profile'}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        colors.neutral[5])
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        semanticColors.bgTertiary)
+                    }
+                    aria-label={userProfile.name || "Profile"}
                   >
                     {isProfileDropdownOpen ? (
-                      <FontAwesomeIcon 
-                        icon={faTimes} 
+                      <FontAwesomeIcon
+                        icon={faTimes}
                         className="w-5 h-5"
                         style={{ color: semanticColors.textPrimary }}
                       />
                     ) : userProfile.imageUrl ? (
                       <img
                         src={userProfile.imageUrl}
-                        alt={userProfile.name || 'Profile'}
+                        alt={userProfile.name || "Profile"}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <FontAwesomeIcon 
-                        icon={faUser} 
+                      <FontAwesomeIcon
+                        icon={faUser}
                         className="w-5 h-5"
                         style={{ color: semanticColors.textPrimary }}
                       />
@@ -206,11 +232,15 @@ export default function Header({
 
             {/* Masuk Button - Only show if no userProfile */}
             {!userProfile && (
-              <Button variant="primary" onClick={onNavigateToLogin} className="shrink-0">
+              <Button
+                variant="primary"
+                onClick={onNavigateToLogin}
+                className="shrink-0"
+              >
                 Masuk
               </Button>
             )}
-          
+
             <button
               ref={hamburgerButtonRef}
               onClick={(e) => {
@@ -219,11 +249,16 @@ export default function Header({
               }}
               className="flex items-center justify-center p-2 rounded-full w-[39px] h-[39px] cursor-pointer transition-colors"
               style={{ backgroundColor: semanticColors.bgTertiary }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = colors.neutral[5])
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  semanticColors.bgTertiary)
+              }
             >
-              <FontAwesomeIcon 
-                icon={isMobileMenuOpen ? faTimes : faSearch} 
+              <FontAwesomeIcon
+                icon={isMobileMenuOpen ? faTimes : faSearch}
                 className="w-5 h-5"
                 style={{ color: semanticColors.textPrimary }}
               />
@@ -243,7 +278,10 @@ export default function Header({
             </div>
             <h1
               className="font-black text-3xl"
-              style={{ fontFamily: "'Nunito', sans-serif", color: semanticColors.textPrimary }}
+              style={{
+                fontFamily: "'Nunito', sans-serif",
+                color: semanticColors.textPrimary,
+              }}
             >
               KiosKu
             </h1>
@@ -258,15 +296,22 @@ export default function Header({
                     placeholder="Masukkan Lokasi Anda "
                     value={locationSearch}
                     onChange={(e) => onLocationSearchChange?.(e.target.value)}
-                    leftIcon={<FontAwesomeIcon icon={faLocationDot} className="w-4 h-4" />}
+                    leftIcon={
+                      <FontAwesomeIcon
+                        icon={faLocationDot}
+                        className="w-4 h-4"
+                      />
+                    }
                     className="flex-1"
                   />
-                  
+
                   <TextField
                     placeholder="Nyari UMKM apa nih?"
                     value={umkmSearch}
                     onChange={(e) => onUmkmSearchChange?.(e.target.value)}
-                    leftIcon={<FontAwesomeIcon icon={faSearch} className="w-4 h-4" />}
+                    leftIcon={
+                      <FontAwesomeIcon icon={faSearch} className="w-4 h-4" />
+                    }
                     className="flex-1"
                   />
 
@@ -294,12 +339,17 @@ export default function Header({
                 <button
                   className="flex items-center justify-center p-2 rounded-full w-[39px] h-[39px] cursor-pointer transition-colors"
                   style={{ backgroundColor: semanticColors.bgTertiary }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = colors.neutral[5])
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor =
+                      semanticColors.bgTertiary)
+                  }
                   onClick={handleFavoritesClick}
                 >
-                  <FontAwesomeIcon 
-                    icon={faHeart} 
+                  <FontAwesomeIcon
+                    icon={faHeart}
                     className="w-5 h-5"
                     style={{ color: brandColors.primary }}
                   />
@@ -320,10 +370,7 @@ export default function Header({
 
             {/* Profile Picture or Login/Signup Buttons */}
             {userProfile ? (
-              <div 
-                className="relative" 
-                ref={profileDropdownRef}
-              >
+              <div className="relative" ref={profileDropdownRef}>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -332,19 +379,24 @@ export default function Header({
                   }}
                   className="flex items-center justify-center rounded-full w-[39px] h-[39px] cursor-pointer transition-colors overflow-hidden"
                   style={{ backgroundColor: semanticColors.bgTertiary }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.neutral[5]}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
-                  aria-label={userProfile.name || 'Profile'}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = colors.neutral[5])
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor =
+                      semanticColors.bgTertiary)
+                  }
+                  aria-label={userProfile.name || "Profile"}
                 >
                   {userProfile.imageUrl ? (
                     <img
                       src={userProfile.imageUrl}
-                      alt={userProfile.name || 'Profile'}
+                      alt={userProfile.name || "Profile"}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <FontAwesomeIcon 
-                      icon={faUser} 
+                    <FontAwesomeIcon
+                      icon={faUser}
                       className="w-5 h-5"
                       style={{ color: semanticColors.textPrimary }}
                     />
@@ -372,11 +424,17 @@ export default function Header({
                         }}
                         className="flex items-center gap-3 px-3 py-2 rounded-[8px] cursor-pointer transition-colors w-full text-left"
                         style={{ color: semanticColors.textPrimary }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgSecondary}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            semanticColors.bgSecondary)
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            "transparent")
+                        }
                       >
-                        <FontAwesomeIcon 
-                          icon={faGear} 
+                        <FontAwesomeIcon
+                          icon={faGear}
                           className="w-4 h-4"
                           style={{ color: semanticColors.textPrimary }}
                         />
@@ -399,11 +457,17 @@ export default function Header({
                         }}
                         className="flex items-center gap-3 px-3 py-2 rounded-[8px] cursor-pointer transition-colors w-full text-left"
                         style={{ color: semanticColors.textPrimary }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgSecondary}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            semanticColors.bgSecondary)
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            "transparent")
+                        }
                       >
-                        <FontAwesomeIcon 
-                          icon={faRightFromBracket} 
+                        <FontAwesomeIcon
+                          icon={faRightFromBracket}
                           className="w-4 h-4"
                           style={{ color: semanticColors.textPrimary }}
                         />
@@ -431,7 +495,7 @@ export default function Header({
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div 
+          <div
             ref={mobileMenuRef}
             className="lg:hidden flex flex-col gap-6 pt-4"
           >
@@ -442,15 +506,19 @@ export default function Header({
                   placeholder="Masukkan Lokasi Anda "
                   value={locationSearch}
                   onChange={(e) => onLocationSearchChange?.(e.target.value)}
-                  leftIcon={<FontAwesomeIcon icon={faLocationDot} className="w-4 h-4" />}
+                  leftIcon={
+                    <FontAwesomeIcon icon={faLocationDot} className="w-4 h-4" />
+                  }
                   className="w-full"
                 />
-                
+
                 <TextField
                   placeholder="Nyari UMKM apa nih?"
                   value={umkmSearch}
                   onChange={(e) => onUmkmSearchChange?.(e.target.value)}
-                  leftIcon={<FontAwesomeIcon icon={faSearch} className="w-4 h-4" />}
+                  leftIcon={
+                    <FontAwesomeIcon icon={faSearch} className="w-4 h-4" />
+                  }
                   className="w-full"
                 />
 
@@ -471,7 +539,7 @@ export default function Header({
 
         {/* Mobile Profile Dropdown */}
         {isProfileDropdownOpen && userProfile && (
-          <div 
+          <div
             ref={profileDropdownRef}
             data-mobile-profile-dropdown
             className="lg:hidden flex flex-col gap-4 pt-4"
@@ -489,15 +557,21 @@ export default function Header({
                 setIsProfileDropdownOpen(false);
               }}
               className="flex items-center gap-3 px-3 py-2 rounded-[8px] cursor-pointer transition-colors w-full text-left"
-              style={{ 
+              style={{
                 color: semanticColors.textPrimary,
-                backgroundColor: semanticColors.bgTertiary
+                backgroundColor: semanticColors.bgTertiary,
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgSecondary}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  semanticColors.bgSecondary)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  semanticColors.bgTertiary)
+              }
             >
-              <FontAwesomeIcon 
-                icon={faGear} 
+              <FontAwesomeIcon
+                icon={faGear}
                 className="w-5 h-5"
                 style={{ color: semanticColors.textPrimary }}
               />
@@ -519,21 +593,25 @@ export default function Header({
                 setIsProfileDropdownOpen(false);
               }}
               className="flex items-center gap-3 px-3 py-2 rounded-[8px] cursor-pointer transition-colors w-full text-left"
-              style={{ 
+              style={{
                 color: semanticColors.textPrimary,
-                backgroundColor: semanticColors.bgTertiary
+                backgroundColor: semanticColors.bgTertiary,
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgSecondary}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = semanticColors.bgTertiary}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  semanticColors.bgSecondary)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  semanticColors.bgTertiary)
+              }
             >
-              <FontAwesomeIcon 
-                icon={faRightFromBracket} 
+              <FontAwesomeIcon
+                icon={faRightFromBracket}
                 className="w-5 h-5"
                 style={{ color: semanticColors.textPrimary }}
               />
-              <span className="font-dm-sans font-regular text-sm">
-                Keluar
-              </span>
+              <span className="font-dm-sans font-regular text-sm">Keluar</span>
             </button>
           </div>
         )}
@@ -550,4 +628,3 @@ export default function Header({
     </header>
   );
 }
-

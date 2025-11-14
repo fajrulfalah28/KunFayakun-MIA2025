@@ -33,6 +33,7 @@ import {
   query,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 const KIOS_COLLECTIONS = [
   "Data Ayam & Geprek",
@@ -74,13 +75,6 @@ type UiKios = {
   isPilihanKami: boolean;
   isHalal: boolean;
 };
-
-interface LandingPageProps {
-  isLoggedIn: boolean;
-  onNavigateToLogin: () => void;
-  onNavigateToSignUp: () => void;
-  onNavigateToDetailKios: (id: string) => void;
-}
 
 // ———————————————————————————————————
 // Helpers
@@ -190,6 +184,8 @@ const toUiKios = (
     isPilihanKami:
       parseBool(raw["Pilihan Kami"]) ||
       parseBool(raw["pilihan kami"]) ||
+      parseBool(raw["Featured"]) ||
+      parseBool(raw["featured"]) ||
       parseBool(raw["Rekomendasi"]) ||
       parseBool(raw["rekomendasi"]),
 
@@ -239,34 +235,38 @@ const getIconForCategory = (kategori: string) => {
 };
 
 const CATEGORY_MAP: Record<string, string[]> = {
-  Makanan: ["ayam", "bakso", "mie", "seafood", "lele", "sate", "pizza"],
+  Makanan: [
+    "ayam",
+    "bakso",
+    "mie",
+    "seafood",
+    "pecel",
+    "pizza",
+    "snacks",
+    "food",
+  ],
   Halal: [
     "ayam",
     "bakso",
     "mie",
     "seafood",
-    "lele",
-    "sate",
+    "pecel",
     "pizza",
-    "kafe",
-    "ayam bakar",
-    "dessert",
+    "snacks",
+    "food",
   ],
-  Minuman: ["kopi", "teh", "susu", "milkshake", "jus", "kafe"],
+  Minuman: ["kopi", "kafe"],
   Cemilan: ["snack", "jajanan", "roti", "pastry", "kue"],
   Kopi: ["kopi", "kafe"],
-  Nusantara: ["ayam bakar", "sate", "soto", "rawon", "pecel"],
-  Dessert: ["dessert", "es krim", "ice cream", "puding", "snack"],
+  Nusantara: ["pecel"],
+  Dessert: ["snacks"],
   Pizza: ["pizza"],
   Seafood: ["seafood"],
 };
 
-export default function LandingPage({
-  isLoggedIn,
-  onNavigateToLogin,
-  onNavigateToSignUp,
-  onNavigateToDetailKios,
-}: LandingPageProps) {
+export default function LandingPage() {
+  const navigate = useNavigate();
+
   // Search/filter UI
   const [locationSearch, setLocationSearch] = useState("");
   const [umkmSearch, setUmkmSearch] = useState("");
@@ -286,6 +286,8 @@ export default function LandingPage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [cursor, setCursor] = useState<number | null>(null);
   const firstLoadRef = useRef(true);
+
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
   // Ambil daftar kategori unik dari Firestore (sekali di awal)
   useEffect(() => {
@@ -512,10 +514,10 @@ export default function LandingPage({
       style={{ backgroundColor: colors.neutral[3] }}
     >
       <Header
-        onNavigateToLogin={onNavigateToLogin}
-        onNavigateToSignUp={onNavigateToSignUp}
-        onNavigateToHome={() => {}}
-        onNavigateToDetailKios={() => {}}
+        onNavigateToLogin={() => navigate("/login")}
+        onNavigateToSignUp={() => navigate("/signup")}
+        onNavigateToHome={() => navigate("/")}
+        onNavigateToDetailKios={(id) => navigate(`/detail/${id}`)}
         showSearch
         locationSearch={locationSearch}
         onLocationSearchChange={setLocationSearch}
@@ -530,8 +532,7 @@ export default function LandingPage({
             ? {
                 name: "User",
                 imageUrl: "https://i.pravatar.cc/100",
-                onClick: () => {},
-                onSettingsClick: () => onNavigateToDetailKios("settings"),
+                onSettingsClick: () => navigate("/settings"),
                 onLogoutClick: () => {
                   localStorage.removeItem("isLoggedIn");
                   window.location.reload();
@@ -556,7 +557,7 @@ export default function LandingPage({
                 filtered[0].description
               } — Harga mulai dari Rp${filtered[0].price.toLocaleString()}`}
               isPilihanKami={filtered[0].isPilihanKami}
-              onViewClick={() => onNavigateToDetailKios(filtered[0].id)}
+              onViewClick={() => navigate(`/detail/${filtered[0].id}`)}
             />
           ) : (
             <Banner
@@ -748,7 +749,7 @@ export default function LandingPage({
                       isHalal={showHalalStatus}
                       awningColor={getAwningColor(k)}
                       price={k.price}
-                      onClick={() => onNavigateToDetailKios(k.id)}
+                      onClick={() => navigate(`/detail/${k.id}`)}
                     />
                   );
                 })}
