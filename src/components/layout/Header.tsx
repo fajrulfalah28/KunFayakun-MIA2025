@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeart,
-  faLocationDot,
   faSearch,
   faUser,
   faGear,
@@ -12,6 +11,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import Button from "../ui/Button";
 import TextField from "../ui/TextField";
+import LocationAutocomplete from "../ui/LocationAutocomplete";
 import FilterDropdown from "../ui/FilterDropdown";
 import FavoritesModal from "../ui/FavoritesModal";
 import { useFavorites } from "../../contexts/FavoritesContext";
@@ -37,6 +37,7 @@ interface HeaderProps {
   showSearch?: boolean;
   locationSearch?: string;
   onLocationSearchChange?: (value: string) => void;
+  onLocationPlaceSelect?: (placeId: string, location: string) => void;
   umkmSearch?: string;
   onUmkmSearchChange?: (value: string) => void;
   timeFilter?: string;
@@ -57,6 +58,7 @@ export default function Header({
   showSearch = false,
   locationSearch = "",
   onLocationSearchChange,
+  onLocationPlaceSelect,
   umkmSearch = "",
   onUmkmSearchChange,
   timeFilter = "",
@@ -230,6 +232,30 @@ export default function Header({
               </>
             )}
 
+            {/* Favorites icon - Only show if no userProfile */}
+            {!userProfile && (
+              <button
+                onClick={onNavigateToLogin}
+                className="flex items-center justify-center p-2 rounded-full w-[39px] h-[39px] cursor-pointer transition-colors"
+                style={{ backgroundColor: semanticColors.bgTertiary }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = colors.neutral[5])
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    semanticColors.bgTertiary)
+                }
+                aria-label="Lihat favorit"
+                title="Lihat favorit"
+              >
+                <FontAwesomeIcon
+                  icon={faHeart}
+                  className="w-5 h-5"
+                  style={{ color: brandColors.primary }}
+                />
+              </button>
+            )}
+
             {/* Masuk Button - Only show if no userProfile */}
             {!userProfile && (
               <Button
@@ -292,16 +318,11 @@ export default function Header({
             <div className="flex items-center gap-4 flex-1 max-w-[692px]">
               {showSearch ? (
                 <>
-                  <TextField
+                  <LocationAutocomplete
                     placeholder="Masukkan Lokasi Anda "
                     value={locationSearch}
-                    onChange={(e) => onLocationSearchChange?.(e.target.value)}
-                    leftIcon={
-                      <FontAwesomeIcon
-                        icon={faLocationDot}
-                        className="w-4 h-4"
-                      />
-                    }
+                    onChange={onLocationSearchChange}
+                    onPlaceSelect={onLocationPlaceSelect}
                     className="flex-1"
                   />
 
@@ -481,6 +502,30 @@ export default function Header({
               </div>
             ) : (
               <>
+                {/* Favorites icon - Only show if no userProfile */}
+                {!userProfile && (
+                  <button
+                    onClick={onNavigateToLogin}
+                    className="flex items-center justify-center p-2 rounded-full w-[39px] h-[39px] cursor-pointer transition-colors"
+                    style={{ backgroundColor: semanticColors.bgTertiary }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = colors.neutral[5])
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        semanticColors.bgTertiary)
+                    }
+                    aria-label="Lihat favorit"
+                    title="Lihat favorit"
+                  >
+                    <FontAwesomeIcon
+                      icon={faHeart}
+                      className="w-5 h-5"
+                      style={{ color: brandColors.primary }}
+                    />
+                  </button>
+                )}
+
                 <Button variant="secondary" onClick={onNavigateToLogin}>
                   Masuk
                 </Button>
@@ -502,13 +547,11 @@ export default function Header({
             {/* Search Fields */}
             {showSearch && (
               <div className="flex flex-col gap-3">
-                <TextField
+                <LocationAutocomplete
                   placeholder="Masukkan Lokasi Anda "
                   value={locationSearch}
-                  onChange={(e) => onLocationSearchChange?.(e.target.value)}
-                  leftIcon={
-                    <FontAwesomeIcon icon={faLocationDot} className="w-4 h-4" />
-                  }
+                  onChange={onLocationSearchChange}
+                  onPlaceSelect={onLocationPlaceSelect}
                   className="w-full"
                 />
 

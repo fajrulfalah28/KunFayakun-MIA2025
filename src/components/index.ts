@@ -6,6 +6,7 @@ export { default as TextField } from './ui/TextField';
 export { default as Select } from './ui/Select';
 export { default as ChipSelector } from './ui/ChipSelector';
 export { default as FilterDropdown } from './ui/FilterDropdown';
+export { default as LocationAutocomplete } from './ui/LocationAutocomplete';
 export { default as FavoritesModal } from './ui/FavoritesModal';
 export type { FavoriteProduct } from './ui/FavoritesModal';
 

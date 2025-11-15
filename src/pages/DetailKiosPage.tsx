@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db, googleMapsApiKey } from "../firebase";
 
-import { Header, Footer, ProductCard, CheckBadgeIcon } from "../components";
+import { Header, Footer, ProductCard, CheckBadgeIcon, GoFoodIcon, ShopeeFoodIcon, WhatsappIcon, InstagramIcon } from "../components";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLocationDot,
@@ -161,7 +161,7 @@ const detectCategory = (categories: string) => {
       name: "Pizza",
       keywords: ["pizza"],
       icon: faPizzaSlice,
-      color: "90EE90",
+      color: "#90EE90",
     },
     {
       name: "Seafood",
@@ -172,6 +172,85 @@ const detectCategory = (categories: string) => {
   ];
 
   return mapping.filter((m) => m.keywords.some((k) => text.includes(k)));
+};
+
+// Fungsi untuk mengekstrak URL dari teks socialLinks
+const extractSocialLink = (text: string, platform: string): string => {
+  // Normalisasi teks agar lowercase untuk pencocokan
+  const lowerText = text.toLowerCase();
+  
+  // Jika platform adalah whatsapp, buat link WhatsApp
+  if (platform === 'whatsapp') {
+    // Cek apakah ada nomor WhatsApp dalam teks
+    const whatsappRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6}/g;
+    const match = text.match(whatsappRegex);
+    if (match) {
+      // Ambil nomor pertama dan format untuk link WhatsApp
+      const phoneNumber = match[0].replace(/\D/g, '');
+      // Format nomor untuk WhatsApp (tanpa nol di awal, dengan kode negara)
+      let formattedNumber = phoneNumber;
+      if (phoneNumber.startsWith('0')) {
+        formattedNumber = '62' + phoneNumber.substring(1);
+      } else if (phoneNumber.startsWith('62')) {
+        formattedNumber = phoneNumber;
+      }
+      return `https://wa.me/${formattedNumber}`;
+    }
+    // Jika tidak menemukan nomor, mungkin hanya ada tautan WhatsApp
+    if (lowerText.includes('whatsapp.com')) {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urlMatch = text.match(urlRegex);
+      if (urlMatch) {
+        return urlMatch[0];
+      }
+    }
+  }
+  
+  // Jika platform adalah instagram
+  if (platform === 'instagram') {
+    if (lowerText.includes('instagram.com')) {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urlMatch = text.match(urlRegex);
+      if (urlMatch) {
+        return urlMatch[0];
+      }
+    }
+    // Jika hanya username Instagram
+    const igRegex = /@?([\w.]+)/g;
+    const igMatches = text.match(igRegex);
+    if (igMatches && igMatches.length > 0) {
+      return `https://www.instagram.com/${igMatches[0].replace('@', '')}`;
+    }
+  }
+  
+  // Jika platform adalah gofood
+  if (platform === 'gofood') {
+    if (lowerText.includes('gofood.co.id') || lowerText.includes('gojek.com')) {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urlMatch = text.match(urlRegex);
+      if (urlMatch) {
+        return urlMatch[0];
+      }
+    }
+    // Alternatif GoFood link
+    return 'https://gofood.co.id';
+  }
+  
+  // Jika platform adalah shopee
+  if (platform === 'shopee') {
+    if (lowerText.includes('shopee') && (lowerText.includes('food') || lowerText.includes('sf'))) {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urlMatch = text.match(urlRegex);
+      if (urlMatch) {
+        return urlMatch[0];
+      }
+    }
+    // Alternatif ShopeeFood link
+    return 'https://shopee.co.id';
+  }
+  
+  // Jika tidak ada URL eksplisit, kembalikan link default
+  return '#';
 };
 
 export default function DetailKiosPage() {
@@ -408,15 +487,27 @@ export default function DetailKiosPage() {
                 <span className="text-sm text-gray-500">Temukan Kami di:</span>
 
                 {kiosData.socialLinks.includes("instagram") && (
-                  <img src="/icons/ig.svg" className="w-6 h-6" />
+                  <a href={extractSocialLink(kiosData.socialLinks, "instagram")} target="_blank" rel="noopener noreferrer">
+                    <InstagramIcon width={24} height={24} />
+                  </a>
                 )}
 
                 {kiosData.socialLinks.includes("gofood") && (
-                  <img src="/icons/gofood.svg" className="w-6 h-6" />
+                  <a href={extractSocialLink(kiosData.socialLinks, "gofood")} target="_blank" rel="noopener noreferrer">
+                    <GoFoodIcon width={24} height={24} />
+                  </a>
                 )}
 
                 {kiosData.socialLinks.includes("shopee") && (
-                  <img src="/icons/shopee.svg" className="w-6 h-6" />
+                  <a href={extractSocialLink(kiosData.socialLinks, "shopee")} target="_blank" rel="noopener noreferrer">
+                    <ShopeeFoodIcon width={24} height={24} />
+                  </a>
+                )}
+
+                {kiosData.socialLinks.includes("whatsapp") && (
+                  <a href={extractSocialLink(kiosData.socialLinks, "whatsapp")} target="_blank" rel="noopener noreferrer">
+                    <WhatsappIcon width={24} height={24} />
+                  </a>
                 )}
               </div>
             )}
@@ -434,12 +525,18 @@ export default function DetailKiosPage() {
               <p className="text-xs text-gray-600 mt-1">{kiosData.address}</p>
 
               <div className="h-[150px] rounded-[12px] border mt-3 overflow-hidden">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src={`https://www.google.com/maps/embed/v1/place?q=place_id:${kiosData.placeId}&key=${googleMapsApiKey}`}
-                  allowFullScreen
-                />
+                {kiosData.placeId ? (
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    src={`https://www.google.com/maps/embed/v1/place?q=place_id:${kiosData.placeId}&key=${googleMapsApiKey}`}
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                    Lokasi tidak tersedia
+                  </div>
+                )}
               </div>
             </div>
           </div>

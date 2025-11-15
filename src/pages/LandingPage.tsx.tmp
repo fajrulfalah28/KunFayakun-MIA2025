@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBowlRice,
@@ -76,7 +76,7 @@ type UiKios = {
   isHalal: boolean;
 };
 
-// ———————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 // Helpers
 const CATEGORY_MAP: Record<string, string[]> = {
   Makanan: [
@@ -202,7 +202,7 @@ const toUiKios = (
 
     location:
       typeof raw["Alamat"] === "string"
-        ? (raw["Alamat"] as string)
+        ? (raw["Alamat"] as string).split(",")[0]
         : "Indonesia",
 
     rating: ratingNum,
@@ -539,7 +539,7 @@ export default function LandingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, onlyFeatured, onlyHalal, umkmSearch, locationSearch, timeFilter, priceFilter]);
 
-  // Search lokal (client-side) untuk nama/alamat—cukup ringan
+  // Search lokal (client-side) untuk nama/alamatâ€”cukup ringan
   const filtered = useMemo(() => {
     const nameQ = umkmSearch.trim().toLowerCase();
     const locQ = locationSearch.trim().toLowerCase();
@@ -548,92 +548,23 @@ export default function LandingPage() {
     let result = items;
     
     // Apply name and location filters
-    // When location is selected, first filter by location, then by name if needed
-    if (locQ) {
+    if (nameQ || locQ) {
       result = result.filter((x) => {
-        // List of kecamatan and kelurahan in Depok based on provided data
-        const depokAreas = [
-          // Kecamatan Beji
-          'beji', 'beji timur', 'kemiri muka', 'kukusan', 'pondok cina', 'tanah baru',
-          // Kecamatan Pancoran Mas
-          'pancoran mas', 'depok', 'depok jaya', 'mampang', 'rangkapan jaya',
-          // Kecamatan Cipayung
-          'cipayung', 'cipayung jaya', 'ratu jaya', 'pondok jaya', 'pondok terong',
-          // Kecamatan Sukmajaya
-          'sukmajaya', 'abadijaya', 'baktijaya', 'mekarjaya',
-          // Kecamatan Cimanggis
-          'tugu', 'mekarsari', 'harjamukti', 'curug', 'cisalak pasar', 'sukatani',
-          // Kecamatan Cilodong
-          'cilodong', 'jatimulya', 'kalibaru', 'kalimulya',
-          // Kecamatan Tapos
-          'tapos', 'cilangkap', 'sukatani', 'leuwinanggung',
-          // Kecamatan Cinere
-          'cinere', 'gandul', 'pangkalan jati', 'pangkalan jati baru',
-          // Kecamatan Limo
-          'limo', 'grogol', 'krukut', 'meruyung',
-          // Kecamatan Sawangan
-          'sawangan', 'sawangan baru', 'bedahan', 'cinangka',
-          // Kecamatan Bojongsari
-          'bojongsari', 'bojongsari baru', 'curug', 'duren mekar', 'duren seribu', 'pondok petir'
-        ];
-        
-        // Also include kecamatan names for filtering
-        const depokKecamatans = [
-          'kecamatan beji', 'beji', 'kecamatan pancoran mas', 'pancoran mas',
-          'kecamatan cipayung', 'cipayung', 'kecamatan sukmajaya', 'sukmajaya',
-          'kecamatan cimanggis', 'cimanggis', 'kecamatan cilodong', 'cilodong',
-          'kecamatan tapos', 'tapos', 'kecamatan cinere', 'cinere',
-          'kecamatan limo', 'limo', 'kecamatan sawangan', 'sawangan',
-          'kecamatan bojongsari', 'bojongsari'
-        ];
-        
-        const locQLower = locQ.toLowerCase();
-        
-        // Check if the input matches any Depok area names
-        const matchesArea = depokAreas.some(area => 
-          locQLower.includes(area) || area.includes(locQLower)
-        );
-        
-        // Check if the input matches any kecamatan names
-        const matchesKecamatan = depokKecamatans.some(kec => 
-          locQLower.includes(kec) || kec.includes(locQLower)
-        );
-        
-        // If searching for a specific Depok area or kecamatan
-        if (matchesArea || matchesKecamatan) {
-          // Check if the item's location contains the area name and is in Depok
-          const locationMatch = x.location.toLowerCase().includes(locQLower) || 
-                               depokAreas.some(area => 
-                                 x.location.toLowerCase().includes(area) && locQLower.includes(area)
-                               ) ||
-                               depokKecamatans.some(kec => 
-                                 x.location.toLowerCase().includes(kec) && locQLower.includes(kec)
-                               );
-          
-          // Also check if the location is in Depok
-          const inDepok = x.location.toLowerCase().includes('depok');
-          
-          // Then apply name filter if also specified
-          const nameCheck = !nameQ || x.name.toLowerCase().includes(nameQ);
-          
-          return locationMatch && inDepok && nameCheck;
-        } else {
-          // General search - match location and ensure it's in Depok
-          const locationMatch = x.location.toLowerCase().includes(locQLower);
-          const inDepok = x.location.toLowerCase().includes('depok');
-          // Then apply name filter if also specified
-          const nameCheck = !nameQ || x.name.toLowerCase().includes(nameQ);
-          return locationMatch && inDepok && nameCheck;
-        }
+        const okName = !nameQ || x.name.toLowerCase().includes(nameQ);
+        const okLoc = !locQ || 
+          x.location.toLowerCase().includes(locQ) ||
+          // Additional check for more comprehensive location matching
+          (locQ.includes('kelurahan') && x.location.toLowerCase().includes(locQ.replace('kelurahan', '').trim())) ||
+          (locQ.includes('kecamatan') && x.location.toLowerCase().includes(locQ.replace('kecamatan', '').trim())) ||
+          (locQ.includes('kota') && x.location.toLowerCase().includes(locQ.replace('kota', '').trim())) ||
+          (locQ.includes('kabupaten') && x.location.toLowerCase().includes(locQ.replace('kabupaten', '').trim()));
+        return okName && okLoc;
       });
-      
-      // Then apply name filter if also specified
-      if (nameQ) {
-        result = result.filter((x) => x.name.toLowerCase().includes(nameQ));
-      }
-    } else if (nameQ) {
-      // If only name is specified, apply to all
-      result = result.filter((x) => x.name.toLowerCase().includes(nameQ));
+    }
+    
+    // Additional filter to ensure location matches if "Depok" is part of the query
+    if (locQ.toLowerCase().includes('depok')) {
+      result = result.filter((x) => x.location.toLowerCase().includes('depok'));
     }
 
     // Apply time and price sorting (we handle this client-side after filtering)
@@ -663,7 +594,7 @@ export default function LandingPage() {
     return result;
   }, [items, umkmSearch, locationSearch, timeFilter, priceFilter]);
 
-  // Kumpulan chip kategori “fixed” (ikon)
+  // Kumpulan chip kategori â€œfixedâ€ (ikon)
   const chipDefs = [
     {
       id: "all",
@@ -696,7 +627,7 @@ export default function LandingPage() {
   // UI chips scroll
   const chipsContainerRef = useRef<HTMLDivElement>(null);
 
-  // ————————————————— UI
+  // â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€” UI
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -739,7 +670,7 @@ export default function LandingPage() {
         <div className="max-w-[1440px] mx-auto">
           {loading ? (
             <div className="flex justify-center py-16">
-              <p style={{ color: semanticColors.textPrimary }}>Loading…</p>
+              <p style={{ color: semanticColors.textPrimary }}>Loadingâ€¦</p>
             </div>
           ) : filtered.length > 0 ? (
             <Banner
@@ -747,7 +678,7 @@ export default function LandingPage() {
               title={filtered[0].name}
               description={`${
                 filtered[0].description
-              } — Harga mulai dari Rp${filtered[0].price.toLocaleString()}`}
+              } â€” Harga mulai dari Rp${filtered[0].price.toLocaleString()}`}
               isPilihanKami={filtered[0].isPilihanKami}
               onViewClick={() => navigate(`/detail/${filtered[0].id}`)}
             />
@@ -912,7 +843,7 @@ export default function LandingPage() {
         <div className="max-w-[1440px] mx-auto">
           {loading ? (
             <div className="flex justify-center py-16">
-              <p style={{ color: semanticColors.textPrimary }}>Memuat data…</p>
+              <p style={{ color: semanticColors.textPrimary }}>Memuat dataâ€¦</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex justify-center py-16">
@@ -977,3 +908,4 @@ export default function LandingPage() {
     </div>
   );
 }
+
