@@ -7,6 +7,8 @@ import { semanticColors } from "../styles/colors";
 import ShopIcon from "../components/icons/ShopIcon";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ export default function LoginPage() {
   );
 
   const [formData, setFormData] = useState({
-    contact: "",
+    email: "",
     password: "",
   });
 
@@ -51,14 +53,40 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      toast.loading("Memproses...");
 
-    toast.success("Login berhasil!");
+      const email = formData.email;
+      const password = formData.password;
 
-    localStorage.setItem("isLoggedIn", "true");
-    window.dispatchEvent(new Event("storage"));
+      const result = await signInWithEmailAndPassword(auth, email, password);
 
-    navigate("/");
+      toast.dismiss();
+      toast.success("Login berhasil!");
+
+      // Simpan status login
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("uid", result.user.uid);
+
+      // Redirect
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+    } catch (error: any) {
+      toast.dismiss();
+
+      const errorMsg =
+        error.code === "auth/user-not-found"
+          ? "Akun tidak ditemukan"
+          : error.code === "auth/wrong-password"
+          ? "Password salah"
+          : error.code === "auth/invalid-email"
+          ? "Format email salah"
+          : "Gagal login. Coba lagi.";
+
+      toast.error(errorMsg);
+    }
+
     setIsLoading(false);
   };
 
@@ -97,16 +125,13 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <Input
-              label="Kontak"
-              placeholder="123-4567-8910"
-              value={formData.contact}
+              label="Email"
+              placeholder="Masukkan Email"
+              value={formData.email}
               onChange={(e) =>
-                setFormData({ ...formData, contact: e.target.value })
+                setFormData({ ...formData, email: e.target.value })
               }
               error={errors.contact}
-              leftIcon={
-                <span style={{ color: semanticColors.textPrimary }}>+62</span>
-              }
             />
 
             <Input

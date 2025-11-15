@@ -17,6 +17,9 @@ import FavoritesModal from "../ui/FavoritesModal";
 import { useFavorites } from "../../contexts/FavoritesContext";
 import { semanticColors, brandColors, colors } from "../../styles/colors";
 import ShopIcon from "../icons/ShopIcon";
+import DefaultProfileAvatar from "../icons/DefaultProfileAvatar";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 
 interface HeaderProps {
   onNavigateToLogin: () => void;
@@ -79,6 +82,22 @@ export default function Header({
     setIsFavoritesModalOpen(true);
     onFavoritesClick?.();
   };
+
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const ref = doc(db, "users", user.uid);
+
+    const unsub = onSnapshot(ref, (snap) => {
+      const data = snap.data();
+      setProfilePhoto(data?.photoURL || null);
+    });
+
+    return () => unsub();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -409,18 +428,13 @@ export default function Header({
                   }
                   aria-label={userProfile.name || "Profile"}
                 >
-                  {userProfile.imageUrl ? (
+                  {profilePhoto ? (
                     <img
-                      src={userProfile.imageUrl}
-                      alt={userProfile.name || "Profile"}
-                      className="w-full h-full object-cover"
+                      src={profilePhoto}
+                      className="w-10 h-10 object-cover rounded-full"
                     />
                   ) : (
-                    <FontAwesomeIcon
-                      icon={faUser}
-                      className="w-5 h-5"
-                      style={{ color: semanticColors.textPrimary }}
-                    />
+                    <DefaultProfileAvatar size={40} />
                   )}
                 </button>
 
@@ -509,7 +523,8 @@ export default function Header({
                     className="flex items-center justify-center p-2 rounded-full w-[39px] h-[39px] cursor-pointer transition-colors"
                     style={{ backgroundColor: semanticColors.bgTertiary }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.backgroundColor = colors.neutral[5])
+                      (e.currentTarget.style.backgroundColor =
+                        colors.neutral[5])
                     }
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.backgroundColor =

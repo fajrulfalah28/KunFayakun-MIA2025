@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -14,7 +15,7 @@ const firebaseConfig = {
   storageBucket: "project-1a63cadb-87d8-4908-9ea.firebasestorage.app",
   messagingSenderId: "1065696454497",
   appId: "1:1065696454497:web:3df8a216b98beaa1518720",
-  measurementId: "G-8J2MSZWT0E"
+  measurementId: "G-8J2MSZWT0E",
 };
 
 // Initialize Firebase
@@ -23,6 +24,7 @@ getAnalytics(app);
 
 // Initialize Firestore
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
 // Google Maps API key
-export const googleMapsApiKey = 'AIzaSyBxBx2TdYzqW_o2eelXa3XVw8VtF7UlMsQ';
+export const googleMapsApiKey = "AIzaSyBxBx2TdYzqW_o2eelXa3XVw8VtF7UlMsQ";

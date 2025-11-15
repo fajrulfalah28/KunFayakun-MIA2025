@@ -6,6 +6,10 @@ import { Input, Button } from "../components";
 import { semanticColors } from "../styles/colors";
 import ShopIcon from "../components/icons/ShopIcon";
 import { useNavigate } from "react-router-dom";
+import { auth, db } from "../firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import toast from "react-hot-toast";
 
 export default function SignUpForm() {
   const navigate = useNavigate();
@@ -37,8 +41,8 @@ export default function SignUpForm() {
   }, [currentBgImage]);
 
   const [formData, setFormData] = useState({
-    namaDepan: "",
-    namaBelakang: "",
+    username: "",
+    email: "",
     contact: "",
     password: "",
     konfirmasiPassword: "",
@@ -53,12 +57,21 @@ export default function SignUpForm() {
     const newErrors: Record<string, string> = {};
     const contactDigits = formData.contact.replace(/\D/g, "");
 
-    if (!formData.namaDepan.trim())
-      newErrors.namaDepan = "Nama depan wajib diisi";
-    if (!formData.namaBelakang.trim())
-      newErrors.namaBelakang = "Nama belakang wajib diisi";
-    if (contactDigits.length !== 11) newErrors.contact = "Harus 11 digit";
+    if (!formData.username.trim()) newErrors.username = "Username wajib diisi";
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      newErrors.email = "Email wajib diisi";
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = "Format email tidak valid";
+    }
+
+    if (contactDigits.length < 11 || contactDigits.length > 12) {
+      newErrors.contact = "Nomor HP harus 12–13 digit";
+    }
+
     if (formData.password.length < 8) newErrors.password = "Minimal 8 karakter";
+
     if (formData.password !== formData.konfirmasiPassword)
       newErrors.konfirmasiPassword = "Password tidak cocok";
 
@@ -73,10 +86,38 @@ export default function SignUpForm() {
 
     setIsLoading(true);
 
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      // 1. Daftar user di Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      const user = userCredential.user;
 
-    // After successful signup → go to login
-    navigate("/login");
+      // 2. Simpan data user ke Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        username: formData.username,
+        email: formData.email,
+        contact: formData.contact,
+        photoURL: "",
+        createdAt: new Date().toISOString(),
+      });
+
+      // 3. Tampilkan toast sukses
+      toast.success("Pendaftaran berhasil!", {
+        duration: 2000,
+      });
+
+      // 4. Delay 2 detik sebelum pindah ke login
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Terjadi kesalahan.");
+    }
 
     setIsLoading(false);
   };
@@ -116,26 +157,28 @@ export default function SignUpForm() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <Input
-              label="Nama Depan"
-              value={formData.namaDepan}
+              label="Username"
+              placeholder="Masukkan Username"
+              value={formData.username}
               onChange={(e) =>
-                setFormData({ ...formData, namaDepan: e.target.value })
+                setFormData({ ...formData, username: e.target.value })
               }
               error={errors.namaDepan}
             />
 
             <Input
-              label="Nama Belakang"
-              value={formData.namaBelakang}
+              label="Email"
+              placeholder="Masukkan Email"
+              value={formData.email}
               onChange={(e) =>
-                setFormData({ ...formData, namaBelakang: e.target.value })
+                setFormData({ ...formData, email: e.target.value })
               }
               error={errors.namaBelakang}
             />
 
             <Input
               label="Kontak"
-              placeholder="123-4567-8910"
+              placeholder="823-4567-8910"
               value={formData.contact}
               onChange={(e) =>
                 setFormData({ ...formData, contact: e.target.value })
@@ -149,6 +192,7 @@ export default function SignUpForm() {
             <Input
               label="Password"
               type={showPassword ? "text" : "password"}
+              placeholder="Masukkan Password"
               value={formData.password}
               onChange={(e) =>
                 setFormData({ ...formData, password: e.target.value })
@@ -168,6 +212,7 @@ export default function SignUpForm() {
             <Input
               label="Konfirmasi Password"
               type={showConfirmPassword ? "text" : "password"}
+              placeholder="Ulangi Password"
               value={formData.konfirmasiPassword}
               onChange={(e) =>
                 setFormData({ ...formData, konfirmasiPassword: e.target.value })
@@ -185,21 +230,25 @@ export default function SignUpForm() {
                 </button>
               }
             />
-          </form>
 
-          <div className="flex flex-col gap-3 mt-8">
-            <Button isLoading={isLoading}>Daftar</Button>
-
-            <p className="text-center" style={{ color: semanticColors.bgDark }}>
-              Sudah punya akun?{" "}
-              <button
-                className="font-bold hover:underline"
-                onClick={() => navigate("/login")}
+            <div className="flex flex-col gap-3 mt-8">
+              <Button isLoading={isLoading} type="submit">
+                Daftar
+              </Button>
+              <p
+                className="text-center"
+                style={{ color: semanticColors.bgDark }}
               >
-                Masuk.
-              </button>
-            </p>
-          </div>
+                Sudah punya akun?{" "}
+                <button
+                  className="font-bold hover:underline"
+                  onClick={() => navigate("/login")}
+                >
+                  Masuk
+                </button>
+              </p>
+            </div>
+          </form>
         </div>
       </div>
     </div>

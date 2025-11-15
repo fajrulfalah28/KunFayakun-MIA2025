@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faKey,
@@ -6,7 +6,6 @@ import {
   faEyeSlash,
   faTimes,
   faPlus,
-  faUser,
   faUtensils,
   faMugHot,
   faCookie,
@@ -31,6 +30,24 @@ import ShopeeFoodIcon from "../components/icons/ShopeeFoodIcon";
 import GoFoodIcon from "../components/icons/GoFoodIcon";
 import InstagramIcon from "../components/icons/InstagramIcon";
 import { useNavigate } from "react-router-dom";
+import DefaultProfileAvatar from "../components/icons/DefaultProfileAvatar";
+import { doc, GeoPoint, onSnapshot, setDoc } from "firebase/firestore";
+import { db, auth, googleMapsApiKey } from "../firebase";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
+
+// Tipe data untuk produk (memperbolehkan File untuk upload baru)
+type Product = {
+  id: number;
+  image: string | File | null;
+  name: string;
+  price: string;
+};
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -49,38 +66,63 @@ export default function SettingsPage() {
   const [profileImage, setProfileImage] = useState<string | undefined>(
     undefined
   );
-  const [namaDepan, setNamaDepan] = useState("Muhammad");
-  const [namaBelakang, setNamaBelakang] = useState("Fajrul Falah");
-  const [whatsappNumber, setWhatsappNumber] = useState("081234567890");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Kios Profile State
-  const [kiosImages, setKiosImages] = useState<string[]>([
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=287&h=193&fit=crop",
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=287&h=193&fit=crop",
-  ]);
-  const [kiosName, setKiosName] = useState("Sate Padang Pak Jawa");
-  const [kiosDescription, setKiosDescription] = useState(
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-  );
-  const [selectedJenisProduk, setSelectedJenisProduk] = useState<string[]>([
-    "food",
-    "nusantara",
-  ]); // Array of selected category IDs
-  const [establishedDay, setEstablishedDay] = useState("12");
-  const [establishedMonth, setEstablishedMonth] = useState("Desember");
-  const [establishedYear, setEstablishedYear] = useState("2020");
+  const [kiosImages, setKiosImages] = useState<(string | File)[]>([]); // Bisa string (URL) atau File
+  const [kiosName, setKiosName] = useState("");
+  const [kiosDescription, setKiosDescription] = useState("");
+  const [selectedJenisProduk, setSelectedJenisProduk] = useState<string[]>([]);
   const [openingTime, setOpeningTime] = useState("17:00");
   const [closingTime, setClosingTime] = useState("22:00");
-  const kiosAddress =
-    "Jalan Kutai Utara Nomor 1, Kelurahan Sumber, Kecamatan Banjarsari, Kota Solo, Jawa Tengah.";
-  const [shopeeFoodUrl, setShopeeFoodUrl] = useState("www.google.com");
-  const [goFoodUrl, setGoFoodUrl] = useState("www.google.com");
-  const [whatsappUrl, setWhatsappUrl] = useState("www.google.com");
-  const [instagramUrl, setInstagramUrl] = useState("www.google.com");
+
+  // Jadikan state agar bisa dimuat dari Firestore
+  const [kiosAddress, setKiosAddress] = useState(
+    "Klik di peta untuk mengatur lokasi..."
+  );
+  const [kiosPlaceId, setKiosPlaceId] = useState<string | null>(null);
+  const [kiosGeopoint, setKiosGeopoint] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerInstanceRef = useRef<google.maps.Marker | null>(null);
+  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+
+  const [shopeeFoodUrl, setShopeeFoodUrl] = useState("");
+  const [goFoodUrl, setGoFoodUrl] = useState("");
+  const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [isSavingKios, setIsSavingKios] = useState(false); // State untuk loading simpan
+
+  // Refs untuk File Inputs
+  const kiosImageInputRef = useRef<HTMLInputElement>(null);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
+  const [activeProductUploadId, setActiveProductUploadId] = useState<
+    number | null
+  >(null);
+
+  const [kategoriManual, setKategoriManual] = useState<string>("");
+
+  const kategoriOptions = [
+    "ayam",
+    "bakso",
+    "mie",
+    "seafood",
+    "pecel",
+    "pizza",
+    "snacks",
+    "food",
+    "kopi",
+  ];
 
   // Available jenis produk categories
   const jenisProdukOptions = [
@@ -117,22 +159,7 @@ export default function SettingsPage() {
   };
 
   // Product Catalog State
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      image:
-        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=287&h=193&fit=crop",
-      name: "Sate Ayam",
-      price: "20000",
-    },
-    {
-      id: 2,
-      image:
-        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=287&h=193&fit=crop",
-      name: "Sate Kambing",
-      price: "25000",
-    },
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   const updateHapusContainerRef = useRef<HTMLDivElement>(null);
   const tambahProdukContainerRef = useRef<HTMLDivElement>(null);
@@ -159,38 +186,200 @@ export default function SettingsPage() {
     };
   }, [products]);
 
+  // Load User Profile Data
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const ref = doc(db, "users", user.uid);
+
+    const unsubscribe = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setUsername(data.username || "");
+        setEmail(data.email || "");
+        setWhatsappNumber(data.contact || "");
+        setProfileImage(data.photoURL || ""); // 🔥 otomatis update UI
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const handleRemoveKiosImage = (index: number) => {
+    // TODO: Implement logic to delete from storage if it's an uploaded URL
     setKiosImages(kiosImages.filter((_, i) => i !== index));
   };
 
-  const handleAddKiosImage = () => {
+  // --- LOGIKA UPLOAD GAMBAR KIOS ---
+  const handleAddKiosImageClick = () => {
     if (kiosImages.length < 3) {
-      setKiosImages([
-        ...kiosImages,
-        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=287&h=193&fit=crop",
-      ]);
+      kiosImageInputRef.current?.click();
+    } else {
+      alert("Maksimal 3 gambar kios.");
     }
   };
 
-  const handleRemoveProductImage = (id: number) => {
-    setProducts(products.map((p) => (p.id === id ? { ...p, image: "" } : p)));
+  const handleKiosImageFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 10MB");
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+      alert("Format harus PNG/JPG/JPEG");
+      return;
+    }
+
+    if (kiosImages.length < 3) {
+      setKiosImages([...kiosImages, file]);
+    }
+    // Clear the file input
+    if (e.target) e.target.value = "";
   };
 
-  const handleAddProductImage = (id: number) => {
-    // In a real app, this would open a file picker
-    console.log("Add image for product", id);
-    // For demo, set a placeholder image
+  const placeMarkerAndPanTo = useCallback(
+    (latLng: google.maps.LatLng) => {
+      if (!mapInstanceRef.current || !geocoderRef.current) return;
+
+      // Hapus marker lama
+      if (markerInstanceRef.current) {
+        markerInstanceRef.current.setMap(null);
+      }
+
+      // Buat marker baru
+      markerInstanceRef.current = new google.maps.Marker({
+        position: latLng,
+        map: mapInstanceRef.current,
+      });
+
+      // Lakukan reverse geocoding
+      geocoderRef.current.geocode({ location: latLng }, (results, status) => {
+        if (status === "OK") {
+          if (results && results[0]) {
+            // Update state dengan data lokasi baru
+            setKiosAddress(results[0].formatted_address);
+            setKiosPlaceId(results[0].place_id);
+            setKiosGeopoint({
+              lat: latLng.lat(),
+              lng: latLng.lng(),
+            });
+          } else {
+            window.alert("Tidak ada hasil yang ditemukan");
+          }
+        } else {
+          window.alert("Geocoder gagal: " + status);
+        }
+      });
+    },
+    [] // Dependencies kosong, karena refs tidak berubah
+  );
+
+  const initMap = useCallback(() => {
+    if (!mapRef.current) return;
+
+    const depok = { lat: -6.4025, lng: 106.7942 };
+    const initialCenter = kiosGeopoint || depok;
+
+    mapInstanceRef.current = new google.maps.Map(mapRef.current, {
+      center: initialCenter,
+      zoom: 15,
+      restriction: {
+        latLngBounds: {
+          north: -6.3,
+          south: -6.5,
+          west: 106.7,
+          east: 106.9,
+        },
+        strictBounds: false,
+      },
+    });
+
+    geocoderRef.current = new google.maps.Geocoder();
+
+    if (kiosGeopoint) {
+      markerInstanceRef.current = new google.maps.Marker({
+        position: kiosGeopoint,
+        map: mapInstanceRef.current,
+      });
+    }
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.addListener(
+        "click",
+        (e: google.maps.MapMouseEvent) => {
+          if (!e.latLng) return;
+          placeMarkerAndPanTo(e.latLng);
+        }
+      );
+    }
+  }, [kiosGeopoint, placeMarkerAndPanTo]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Jika sudah pernah loaded
+    if (window.google && window.google.maps) {
+      initMap();
+      return;
+    }
+
+    // Load script manual
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => initMap();
+    document.body.appendChild(script);
+
+    return () => {
+      if (mapInstanceRef.current) {
+        google.maps.event.clearInstanceListeners(mapInstanceRef.current);
+      }
+    };
+  }, [initMap, kiosGeopoint]);
+
+  // --- LOGIKA UPLOAD GAMBAR PRODUK ---
+  const handleProductImageClick = (id: number) => {
+    setActiveProductUploadId(id);
+    productImageInputRef.current?.click();
+  };
+
+  const handleProductImageFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || activeProductUploadId === null) return;
+
+    // Validasi
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 10MB");
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+      alert("Format harus PNG/JPG/JPEG");
+      return;
+    }
+
     setProducts(
       products.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              image:
-                "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=287&h=193&fit=crop",
-            }
-          : p
+        p.id === activeProductUploadId ? { ...p, image: file } : p
       )
     );
+    setActiveProductUploadId(null);
+    // Clear the file input
+    if (e.target) e.target.value = "";
+  };
+
+  const handleRemoveProductImage = (id: number) => {
+    // TODO: Implement logic to delete from storage
+    setProducts(products.map((p) => (p.id === id ? { ...p, image: null } : p)));
   };
 
   const handleRemoveProduct = (id: number) => {
@@ -199,47 +388,358 @@ export default function SettingsPage() {
 
   const handleUpdateProduct = (id: number) => {
     console.log("Update product", id);
+    // Di aplikasi nyata, ini mungkin akan menyimpan SATU produk ini ke DB
+    // Tapi untuk sekarang, kita simpan semua via Tombol "Simpan Profil Kios"
+    alert(
+      "Perubahan produk akan disimpan saat Anda menekan 'Simpan Profil Kios' di bagian bawah."
+    );
   };
 
   const handleAddProduct = () => {
     const newId = Math.max(...products.map((p) => p.id), 0) + 1;
-    setProducts([...products, { id: newId, image: "", name: "", price: "0" }]);
+    setProducts([
+      ...products,
+      { id: newId, image: null, name: "", price: "0" },
+    ]);
   };
 
   const descriptionCharCount = kiosDescription.length;
   const maxChars = 200;
-
-  // Date options
-  const days = Array.from({ length: 31 }, (_, i) => ({
-    value: String(i + 1),
-    label: String(i + 1),
-  }));
-
-  const months = [
-    { value: "Januari", label: "Januari" },
-    { value: "Februari", label: "Februari" },
-    { value: "Maret", label: "Maret" },
-    { value: "April", label: "April" },
-    { value: "Mei", label: "Mei" },
-    { value: "Juni", label: "Juni" },
-    { value: "Juli", label: "Juli" },
-    { value: "Agustus", label: "Agustus" },
-    { value: "September", label: "September" },
-    { value: "Oktober", label: "Oktober" },
-    { value: "November", label: "November" },
-    { value: "Desember", label: "Desember" },
-  ];
-
-  const years = Array.from({ length: 50 }, (_, i) => {
-    const year = 2024 - i;
-    return { value: String(year), label: String(year) };
-  });
 
   // Time options (hourly from 00:00 to 23:00)
   const timeOptions = Array.from({ length: 24 }, (_, i) => {
     const hour = String(i).padStart(2, "0");
     return { value: `${hour}:00`, label: `${hour}:00` };
   });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi ukuran < 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 10MB");
+      return;
+    }
+
+    // Validasi tipe file
+    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+      alert("Format harus PNG/JPG/JPEG");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Anda harus login terlebih dahulu");
+        return;
+      }
+
+      const storage = getStorage();
+      const filePath = `profile_images/${user.uid}`;
+      const storageRef = ref(storage, filePath);
+
+      // Upload file ke storage
+      await uploadBytes(storageRef, file);
+
+      // Dapatkan URL download
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Update Firestore user
+      await updateProfilePhoto(user.uid, downloadURL);
+
+      // Set preview di UI
+      setProfileImage(downloadURL);
+    } catch (err) {
+      console.error(err);
+      alert("Gagal upload gambar");
+    }
+
+    setIsUploading(false);
+  };
+
+  async function updateProfilePhoto(uid: string, url: string) {
+    const userRef = doc(db, "users", uid);
+    await setDoc(userRef, { photoURL: url }, { merge: true });
+  }
+
+  const handleRemovePhoto = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const storage = getStorage();
+      const fileRef = ref(storage, `profile_images/${user.uid}`);
+
+      // Hapus dari storage
+      await deleteObject(fileRef).catch(() => {});
+
+      // Hapus dari Firestore
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, { photoURL: null }, { merge: true });
+
+      // Hapus di UI
+      setProfileImage(undefined);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- FUNGSI SIMPAN PROFIL KIOS ---
+
+  // Fungsi helper untuk upload gambar Kios
+  async function uploadKiosImage(file: File, index: number) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+
+    const storage = getStorage();
+    // Gunakan nama file unik untuk menghindari timpaan
+    const path = `kios_images/${user.uid}/img_${index}_${Date.now()}`;
+    const storageRef = ref(storage, path);
+
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  }
+
+  // Fungsi helper untuk upload gambar Produk
+  async function uploadProductImage(file: File, productId: number) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+
+    const storage = getStorage();
+    const path = `product_images/${
+      user.uid
+    }/product_${productId}_${Date.now()}`;
+    const storageRef = ref(storage, path);
+
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  }
+
+  // Fungsi untuk menyimpan data Kios ke Firestore
+  async function saveKiosProfile(data: any) {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Harus login terlebih dahulu");
+      return;
+    }
+
+    // Simpan ke koleksi 'kios' dengan ID user
+    const kiosRef = doc(db, "kios", user.uid);
+    await setDoc(kiosRef, data, { merge: true });
+
+    alert("Profil kios berhasil disimpan!");
+  }
+
+  // Handler utama untuk tombol "Simpan Profil Kios"
+  async function handleSaveKiosProfile() {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Anda harus login untuk menyimpan profil kios.");
+      return;
+    }
+
+    setIsSavingKios(true);
+
+    try {
+      // 1. Upload Kios Images (yg berupa File)
+      const finalKiosImageUrls = await Promise.all(
+        kiosImages.map(async (image, index) => {
+          if (typeof image === "string") {
+            return image; // Ini adalah URL yg sudah ada
+          } else {
+            // Ini adalah File, upload
+            return await uploadKiosImage(image, index);
+          }
+        })
+      );
+
+      // 2. Upload Product Images (yg berupa File)
+      const finalKatalogProduk = await Promise.all(
+        products.map(async (product) => {
+          if (product.image instanceof File) {
+            const imageUrl = await uploadProductImage(
+              product.image,
+              product.id
+            );
+            return { ...product, image: imageUrl };
+          } else {
+            // Ini adalah string URL atau null
+            return { ...product, image: product.image || null };
+          }
+        })
+      );
+
+      // 3. Bangun objek data kios
+      const kiosData = {
+        namaKios: kiosName,
+        deskripsi: kiosDescription,
+        jenisProduk: selectedJenisProduk,
+        jamBuka: openingTime,
+        jamTutup: closingTime,
+        rating: 0, // Sesuai permintaan
+        totalReview: 0, // Sesuai permintaan
+        kategori: kategoriManual,
+        alamat: {
+          text: kiosAddress,
+          placeId: kiosPlaceId || "", // Simpan Place ID
+          geopoint: kiosGeopoint
+            ? new GeoPoint(kiosGeopoint.lat, kiosGeopoint.lng) // Simpan GeoPoint
+            : null,
+        },
+        fotoKios: finalKiosImageUrls,
+        katalogProduk: finalKatalogProduk,
+        kontakOnline: {
+          shopee: shopeeFoodUrl,
+          gofood: goFoodUrl,
+          whatsapp: whatsappUrl,
+          instagram: instagramUrl,
+        },
+      };
+
+      // 4. Simpan ke Firestore
+      await saveKiosProfile(kiosData);
+    } catch (error) {
+      console.error("Gagal menyimpan profil kios:", error);
+      alert("Terjadi kesalahan saat menyimpan profil kios.");
+    }
+
+    setIsSavingKios(false);
+  }
+
+  // --- KATEGORI GLOBAL (SESUAI PERMINTAAN) ---
+  // const CATEGORY_MAP: Record<string, string[]> = {
+  //   Makanan: [
+  //     "ayam",
+  //     "bakso",
+  //     "mie",
+  //     "seafood",
+  //     "pecel",
+  //     "pizza",
+  //     "snacks",
+  //     "food",
+  //   ],
+  //   Halal: [
+  //     "ayam",
+  //     "bakso",
+  //     "mie",
+  //     "seafood",
+  //     "pecel",
+  //     "pizza",
+  //     "snacks",
+  //     "food",
+  //   ],
+  //   Minuman: ["kopi", "kafe"],
+  //   Cemilan: ["snack", "jajanan", "roti", "pastry", "kue"],
+  //   Kopi: ["kopi", "kafe"],
+  //   Nusantara: ["pecel"],
+  //   Dessert: ["snacks"],
+  //   Pizza: ["pizza"],
+  //   Seafood: ["seafood"],
+  // };
+
+  // function getKategoriGlobal(selected: string[]) {
+  //   const result = new Set<string>();
+
+  //   selected.forEach((item) => {
+  //     Object.entries(CATEGORY_MAP).forEach(([kategori, daftar]) => {
+  //       if (daftar.includes(item)) result.add(kategori);
+  //     });
+  //   });
+
+  //   return Array.from(result);
+  // }
+
+  // --- EFEK UNTUK MEMUAT DATA KIOS SAAT HALAMAN DIBUKA ---
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Muat data dari 'kios/{uid}'
+    const kiosRef = doc(db, "kios", user.uid);
+
+    const unsub = onSnapshot(kiosRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+
+        setKiosName(data.namaKios || "");
+        setKiosImages(data.fotoKios || []);
+        setKiosDescription(data.deskripsi || "");
+        setSelectedJenisProduk(data.jenisProduk || []);
+        setOpeningTime(data.jamBuka || "17:00");
+        setClosingTime(data.jamTutup || "22:00");
+        setProducts(data.katalogProduk || []);
+        setKategoriManual(data.kategori || "");
+
+        // Muat data alamat
+        setKiosAddress(
+          data.alamat?.text || "Klik di peta untuk mengatur lokasi..."
+        );
+        setKiosPlaceId(data.alamat?.placeId || null);
+        if (data.alamat?.geopoint) {
+          // Konversi Firestore GeoPoint ke objek lat/lng
+          setKiosGeopoint({
+            lat: data.alamat.geopoint.latitude,
+            lng: data.alamat.geopoint.longitude,
+          });
+        } else {
+          setKiosGeopoint(null);
+        }
+
+        // Muat data kontak online
+        setShopeeFoodUrl(data.kontakOnline?.shopee || "");
+        setGoFoodUrl(data.kontakOnline?.gofood || "");
+        setWhatsappUrl(data.kontakOnline?.whatsapp || "");
+        setInstagramUrl(data.kontakOnline?.instagram || "");
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  const fileInputProductRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadProductClick = () => {
+    fileInputProductRef.current?.click();
+  };
+
+  const handleProductUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 10MB");
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+      alert("Format harus PNG/JPG/JPEG");
+      return;
+    }
+
+    const newId = Math.max(...products.map((p) => p.id), 0) + 1;
+
+    // Upload ke Firebase
+    const imageUrl = await uploadProductImage(file, newId);
+
+    // Tambah product baru
+    setProducts([
+      ...products,
+      { id: newId, image: imageUrl, name: "", price: "0" },
+    ]);
+
+    e.target.value = "";
+  };
 
   return (
     <div
@@ -253,7 +753,7 @@ export default function SettingsPage() {
         onNavigateToHome={goHome}
         onNavigateToDetailKios={goDetailKios}
         userProfile={{
-          imageUrl: undefined,
+          imageUrl: profileImage,
           name: "User",
           onClick: () => {},
           onSettingsClick: goSettings,
@@ -273,6 +773,29 @@ export default function SettingsPage() {
         onPriceFilterChange={setPriceFilter}
       />
 
+      {/* Input file tersembunyi */}
+      <input
+        type="file"
+        accept="image/png, image/jpeg, image/jpg"
+        ref={kiosImageInputRef}
+        onChange={handleKiosImageFileChange}
+        style={{ display: "none" }}
+      />
+      <input
+        type="file"
+        accept="image/png, image/jpeg, image/jpg"
+        ref={productImageInputRef}
+        onChange={handleProductImageFileChange}
+        style={{ display: "none" }}
+      />
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputProductRef}
+        style={{ display: "none" }}
+        onChange={handleProductUpload}
+      />
+
       {/* Main Content */}
       <section className="px-4 sm:px-6 lg:px-20 py-6 flex-1">
         <div className="max-w-[1440px] mx-auto flex flex-col gap-4">
@@ -281,6 +804,8 @@ export default function SettingsPage() {
             className="flex flex-col gap-4 p-6 rounded-[12px]"
             style={{ backgroundColor: semanticColors.bgPrimary }}
           >
+            {/* ... (Kode Pengaturan Profil Anda tidak berubah) ... */}
+
             {/* Section Title */}
             <div
               className="flex flex-col gap-3 pb-3 border-b"
@@ -313,16 +838,7 @@ export default function SettingsPage() {
                     className="w-full h-full object-cover rounded-full"
                   />
                 ) : (
-                  <div
-                    className="w-full h-full rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: colors.neutral[4] }}
-                  >
-                    <FontAwesomeIcon
-                      icon={faUser}
-                      className="w-12 h-12"
-                      style={{ color: colors.neutral[7] }}
-                    />
-                  </div>
+                  <DefaultProfileAvatar size={96} />
                 )}
               </div>
               <div className="flex flex-col gap-0.5 flex-1 w-full sm:w-auto text-center sm:text-left">
@@ -342,18 +858,25 @@ export default function SettingsPage() {
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   variant="primary"
-                  onClick={() => console.log("Upload image")}
+                  onClick={handleUploadClick}
                   className="w-full sm:w-auto"
                 >
-                  Upload Gambar Baru
+                  {isUploading ? "Mengupload..." : "Upload Gambar Baru"}
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={() => setProfileImage(undefined)}
+                  onClick={handleRemovePhoto}
                   className="w-full sm:w-auto"
                 >
                   Hapus
                 </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  style={{ display: "none" }}
+                />
               </div>
             </div>
 
@@ -374,12 +897,12 @@ export default function SettingsPage() {
                     className="font-dm-sans font-bold text-sm"
                     style={{ color: semanticColors.textPrimary }}
                   >
-                    Nama Depan
+                    Username
                   </label>
                   <TextField
-                    value={namaDepan}
-                    onChange={(e) => setNamaDepan(e.target.value)}
-                    placeholder="Muhammad"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    disabled
                     className="w-full"
                   />
                 </div>
@@ -388,12 +911,12 @@ export default function SettingsPage() {
                     className="font-dm-sans font-bold text-sm"
                     style={{ color: semanticColors.textPrimary }}
                   >
-                    Nama Belakang
+                    Email
                   </label>
                   <TextField
-                    value={namaBelakang}
-                    onChange={(e) => setNamaBelakang(e.target.value)}
-                    placeholder="Fajrul Falah"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled
                     className="w-full"
                   />
                 </div>
@@ -419,11 +942,15 @@ export default function SettingsPage() {
                   Nomor Whatsapp
                 </label>
                 <TextField
-                  value={whatsappNumber}
-                  onChange={(e) => setWhatsappNumber(e.target.value)}
-                  placeholder="081234567890"
+                  value={`+62 ${
+                    whatsappNumber.startsWith("62")
+                      ? whatsappNumber.slice(2)
+                      : whatsappNumber.startsWith("0")
+                      ? whatsappNumber.slice(1)
+                      : whatsappNumber
+                  }`}
+                  disabled
                   leftIcon={<WhatsappIcon width={16.667} height={16.667} />}
-                  className="w-full"
                 />
               </div>
             </div>
@@ -566,7 +1093,11 @@ export default function SettingsPage() {
                       className="relative w-full sm:w-[287px] h-[193px] rounded-[12px] overflow-hidden"
                     >
                       <img
-                        src={image}
+                        src={
+                          typeof image === "string"
+                            ? image
+                            : URL.createObjectURL(image)
+                        }
                         alt={`Kios ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -585,7 +1116,7 @@ export default function SettingsPage() {
                   ))}
                   {kiosImages.length < 3 && (
                     <button
-                      onClick={handleAddKiosImage}
+                      onClick={handleAddKiosImageClick} // Diubah
                       className="w-full sm:w-[287px] h-[193px] rounded-[12px] flex items-center justify-center cursor-pointer transition-colors"
                       style={{ backgroundColor: colors.neutral[6] }}
                       onMouseEnter={(e) =>
@@ -646,6 +1177,7 @@ export default function SettingsPage() {
                       backgroundColor: semanticColors.bgTertiary,
                       color: semanticColors.textPrimary,
                     }}
+                    maxLength={maxChars} // Batasi input
                   />
                   <p
                     className="font-dm-sans font-regular text-xs"
@@ -693,41 +1225,36 @@ export default function SettingsPage() {
                     </ChipSelector>
                   ))}
                 </div>
-              </div>
-
-              {/* Berdiri Sejak & Jam Buka */}
-              <div className="flex flex-col sm:flex-row gap-4 w-full">
-                <div className="flex flex-col gap-1.5 flex-1">
+                <div className="flex flex-col gap-1.5">
                   <label
                     className="font-dm-sans font-bold text-sm"
                     style={{ color: semanticColors.textPrimary }}
                   >
-                    Berdiri Sejak
+                    Kategori
                   </label>
-                  <div className="flex gap-1.5">
-                    <Select
-                      value={establishedDay}
-                      onChange={setEstablishedDay}
-                      options={days}
-                      placeholder="12"
-                      className="flex-1"
-                    />
-                    <Select
-                      value={establishedMonth}
-                      onChange={setEstablishedMonth}
-                      options={months}
-                      placeholder="Desember"
-                      className="flex-1"
-                    />
-                    <Select
-                      value={establishedYear}
-                      onChange={setEstablishedYear}
-                      options={years}
-                      placeholder="2020"
-                      className="flex-1"
-                    />
-                  </div>
+
+                  <select
+                    value={kategoriManual}
+                    onChange={(e) => setKategoriManual(e.target.value)}
+                    className="w-full p-2 rounded border"
+                    style={{
+                      backgroundColor: semanticColors.bgTertiary,
+                      color: semanticColors.textPrimary,
+                      borderColor: colors.neutral[6],
+                    }}
+                  >
+                    <option value="">-- Pilih kategori --</option>
+                    {kategoriOptions.map((item) => (
+                      <option key={item} value={item}>
+                        {item.charAt(0).toUpperCase() + item.slice(1)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+
+              {/* Jam Buka */}
+              <div className="flex flex-col sm:flex-row gap-4 w-full">
                 <div className="flex flex-col gap-1.5 flex-1">
                   <label
                     className="font-dm-sans font-bold text-sm"
@@ -773,6 +1300,7 @@ export default function SettingsPage() {
                     className="font-dm-sans font-regular text-xs wrap-break-word"
                     style={{ color: semanticColors.textSecondary }}
                   >
+                    {/* Tampilkan alamat yang didapat dari Geocoder */}
                     {kiosAddress}
                   </p>
                 </div>
@@ -780,18 +1308,8 @@ export default function SettingsPage() {
                   className="h-[273px] rounded-[12px] border-2 overflow-hidden"
                   style={{ borderColor: colors.neutral[6] }}
                 >
-                  {/* Placeholder for Google Map */}
-                  <div
-                    className="w-full h-full flex items-center justify-center"
-                    style={{ backgroundColor: colors.neutral[4] }}
-                  >
-                    <p
-                      className="font-dm-sans font-regular text-sm"
-                      style={{ color: semanticColors.textSecondary }}
-                    >
-                      Google Map Placeholder
-                    </p>
-                  </div>
+                  {/* --- MODIFIKASI: Div ini akan menjadi container peta --- */}
+                  <div ref={mapRef} className="w-full h-full" />
                 </div>
               </div>
             </div>
@@ -818,7 +1336,7 @@ export default function SettingsPage() {
                   <TextField
                     value={shopeeFoodUrl}
                     onChange={(e) => setShopeeFoodUrl(e.target.value)}
-                    placeholder="www.google.com"
+                    placeholder="https://shopeefood.co.id/..."
                     leftIcon={<ShopeeFoodIcon width={16.667} height={16.667} />}
                     className="w-full"
                   />
@@ -833,7 +1351,7 @@ export default function SettingsPage() {
                   <TextField
                     value={goFoodUrl}
                     onChange={(e) => setGoFoodUrl(e.target.value)}
-                    placeholder="www.google.com"
+                    placeholder="https://gofood.co.id/..."
                     leftIcon={<GoFoodIcon width={16.667} height={16.667} />}
                     className="w-full"
                   />
@@ -850,7 +1368,7 @@ export default function SettingsPage() {
                   <TextField
                     value={whatsappUrl}
                     onChange={(e) => setWhatsappUrl(e.target.value)}
-                    placeholder="www.google.com"
+                    placeholder="https://wa.me/62..."
                     leftIcon={<WhatsappIcon width={16.667} height={16.667} />}
                     className="w-full"
                   />
@@ -865,7 +1383,7 @@ export default function SettingsPage() {
                   <TextField
                     value={instagramUrl}
                     onChange={(e) => setInstagramUrl(e.target.value)}
-                    placeholder="www.google.com"
+                    placeholder="https://instagram.com/..."
                     leftIcon={<InstagramIcon width={16.667} height={16.667} />}
                     className="w-full"
                   />
@@ -890,7 +1408,11 @@ export default function SettingsPage() {
                     {product.image ? (
                       <>
                         <img
-                          src={product.image}
+                          src={
+                            typeof product.image === "string"
+                              ? product.image
+                              : URL.createObjectURL(product.image)
+                          }
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />
@@ -908,7 +1430,7 @@ export default function SettingsPage() {
                       </>
                     ) : (
                       <button
-                        onClick={() => handleAddProductImage(product.id)}
+                        onClick={() => handleProductImageClick(product.id)} // Diubah
                         className="w-full h-full flex items-center justify-center cursor-pointer transition-colors"
                         style={{ backgroundColor: colors.neutral[6] }}
                         onMouseEnter={(e) =>
@@ -972,10 +1494,8 @@ export default function SettingsPage() {
                               )}`
                         }
                         onChange={(e) => {
-                          const numericValue = e.target.value.replace(
-                            /[^\d]/g,
-                            ""
-                          );
+                          const numericValue =
+                            e.target.value.replace(/[^\d]/g, "") || "0";
                           setProducts(
                             products.map((p) =>
                               p.id === product.id
@@ -1014,7 +1534,7 @@ export default function SettingsPage() {
               {/* Add Product Button */}
               <div className="flex flex-col sm:flex-row gap-4 items-end">
                 <button
-                  onClick={handleAddProduct}
+                  onClick={handleUploadProductClick}
                   className="w-full sm:w-[105.58px] h-[71px] rounded-[4.415px] flex items-center justify-center cursor-pointer transition-colors shrink-0"
                   style={{ backgroundColor: colors.neutral[6] }}
                   onMouseEnter={(e) =>
@@ -1072,6 +1592,18 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* --- TOMBOL SIMPAN UTAMA --- */}
+            <div className="flex justify-end pt-4 mt-4 border-t border-neutral-6">
+              <Button
+                variant="primary"
+                onClick={handleSaveKiosProfile}
+                disabled={isSavingKios}
+                className="w-full sm:w-auto"
+              >
+                {isSavingKios ? "Menyimpan..." : "Simpan Profil Kios"}
+              </Button>
             </div>
           </div>
         </div>

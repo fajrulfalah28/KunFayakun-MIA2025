@@ -31,6 +31,7 @@ import {
   getDocs,
   limit,
   query,
+  collectionGroup,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +45,7 @@ const KIOS_COLLECTIONS = [
   "Data Pecel Lele",
   "Data Pizza",
   "Data Seafood",
+  "kios",
 ] as const;
 
 type FireKios = {
@@ -132,109 +134,114 @@ const guessImageByCategory = (kategori?: string | string[]) => {
   return "https://images.unsplash.com/photo-1634871572365-8bc444e6faea?w=574&h=386&fit=crop&q=80&auto=format";
 };
 
-const parseBool = (value: unknown): boolean => {
-  if (value === true) return true;
-  if (value === false) return false;
-  if (typeof value === "string") {
-    return value.toLowerCase() === "true";
-  }
-  return false;
-};
+// const parseBool = (value: unknown): boolean => {
+//   if (value === true) return true;
+//   if (value === false) return false;
+//   if (typeof value === "string") {
+//     return value.toLowerCase() === "true";
+//   }
+//   return false;
+// };
 
 const toUiKios = (
   doc: QueryDocumentSnapshot<DocumentData, DocumentData>
 ): UiKios => {
-  const raw = doc.data() as Record<string, unknown>;
-  let ratingNum = 0;
-  if (typeof raw["Rating"] === "string") {
-    ratingNum = parseFloat(raw["Rating"] as string);
-  } else if (typeof raw["Rating"] === "number") {
-    ratingNum = raw["Rating"] as number;
-  }
+  const raw = doc.data() as Record<string, any>;
 
   let categories = "Makanan";
-  const rawKategori = raw["Kategori"];
-  if (Array.isArray(rawKategori)) {
-    categories = (rawKategori as string[]).join(", ");
-  } else if (typeof rawKategori === "string") {
-    categories = rawKategori as string;
+
+  // 🔥 1. BACA kategori manual yang disimpan user
+  if (typeof raw.kategori === "string" && raw.kategori) {
+    categories = raw.kategori;
   }
 
-  const lowerCat = categories.toLowerCase();
-  const halalKeywords = CATEGORY_MAP["Halal"] || [];
-  const isHalalByCategory = halalKeywords.some((k) => lowerCat.includes(k));
+  // 2. Jika user pilih chip jenisProduk
+  else if (Array.isArray(raw.jenisProduk) && raw.jenisProduk.length > 0) {
+    categories = raw.jenisProduk.join(", ");
+  }
+
+  // 3. Dari AI auto detect (jika ada)
+  else if (typeof raw.kategoriTeridentifikasi === "string") {
+    categories = raw.kategoriTeridentifikasi;
+  }
+
+  // 4. Dari dataset FIRESTORE lama
+  else if (Array.isArray(raw["Kategori"])) {
+    categories = raw["Kategori"].join(", ");
+  } else if (typeof raw["Kategori"] === "string") {
+    categories = raw["Kategori"];
+  }
+
+  // Convert rating
+  const rating =
+    typeof raw.Rating === "number"
+      ? raw.Rating
+      : typeof raw.Rating === "string"
+      ? parseFloat(raw.Rating)
+      : 0;
+
+  // Halal otomatis
+  const halalAuto =
+    raw.Halal === true ||
+    raw.halal === true ||
+    categories.toLowerCase().includes("halal");
 
   return {
     id: doc.id,
 
-    image:
-      (typeof raw["Foto UMKM"] === "string"
-        ? (raw["Foto UMKM"] as string)
-        : undefined) ||
-      guessImageByCategory(raw["Kategori"] as string | string[] | undefined),
+    image: raw["Foto UMKM"] || raw.fotoKios || guessImageByCategory(categories),
 
     placeImage:
-      typeof raw["Foto Tempat"] === "string"
-        ? (raw["Foto Tempat"] as string)
-        : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
+      raw["Foto Tempat"] ||
+      (raw.fotoKios && raw.fotoKios[0]) ||
+      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
 
     price:
       typeof raw["Harga Produk"] === "string"
-        ? parseInt(raw["Harga Produk"] as string)
+        ? parseInt(raw["Harga Produk"])
         : 0,
 
-    name:
-      (typeof raw["Nama UMKM"] === "string"
-        ? (raw["Nama UMKM"] as string)
-        : undefined) || "Nama UMKM",
+    name: raw["Nama UMKM"] || raw.namaKios || "Nama UMKM",
 
     description:
-      (typeof raw["Deskripsi UMKM"] === "string"
-        ? (raw["Deskripsi UMKM"] as string)
-        : undefined) ||
-      `Tentang ${
-        typeof raw["Nama UMKM"] === "string"
-          ? (raw["Nama UMKM"] as string)
-          : "UMKM"
-      }`,
+      raw["Deskripsi UMKM"] ||
+      raw.deskripsi ||
+      `Tentang ${raw["Nama UMKM"] || "UMKM"}`,
 
     categories,
 
-    location:
-      typeof raw["Alamat"] === "string"
-        ? (raw["Alamat"] as string)
-        : "Indonesia",
+    location: raw["Alamat"] || raw.alamat?.text || "Lokasi tidak diketahui",
 
-    rating: ratingNum,
+    rating,
 
     operatingHours:
-      typeof raw["Jam Operasional"] === "string"
-        ? (raw["Jam Operasional"] as string)
-        : "08:00 - 20:00",
-    isPilihanKami:
-      parseBool(raw["Pilihan Kami"]) ||
-      parseBool(raw["pilihan kami"]) ||
-      parseBool(raw["Featured"]) ||
-      parseBool(raw["featured"]) ||
-      parseBool(raw["Rekomendasi"]) ||
-      parseBool(raw["rekomendasi"]),
+      raw["Jam Operasional"] ||
+      `${raw.jamBuka || "08:00"} - ${raw.jamTutup || "20:00"}`,
 
-    isHalal:
-      raw["Halal"] === true || raw["halal"] === true || isHalalByCategory,
+    isPilihanKami:
+      raw["Pilihan Kami"] === true ||
+      raw.pilihanKami === true ||
+      raw.featured === true,
+
+    isHalal: halalAuto,
   };
 };
 
 const fetchAllKios = async (): Promise<UiKios[]> => {
   const all: UiKios[] = [];
 
+  // Ambil MEGA DATA lama
   for (const colName of KIOS_COLLECTIONS) {
     const colRef = collection(db, colName);
     const snap = await getDocs(colRef);
-
-    snap.forEach((doc) => {
-      all.push(toUiKios(doc));
-    });
+    snap.forEach((doc) => all.push(toUiKios(doc)));
   }
+
+  // 🔥 Ambil semua kios baru buatan user
+  const groupSnap = await getDocs(collectionGroup(db, "kios"));
+  groupSnap.forEach((doc) => {
+    all.push(toUiKios(doc));
+  });
 
   return all;
 };
@@ -264,7 +271,6 @@ const getIconForCategory = (kategori: string) => {
   return faUtensils;
 };
 
-
 export default function LandingPage() {
   const navigate = useNavigate();
 
@@ -289,6 +295,7 @@ export default function LandingPage() {
   const firstLoadRef = useRef(true);
 
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  const profileImageUrl = undefined;
 
   // Ambil daftar kategori unik dari Firestore (sekali di awal)
   useEffect(() => {
@@ -314,44 +321,6 @@ export default function LandingPage() {
       setAllCategories(Array.from(set).length ? Array.from(set) : base);
     })().catch(console.error);
   }, []);
-
-  // Build query sesuai filter
-  // const buildBaseQuery = (): Query<FireKios> => {
-  //   const col = collection(db, "kios") as CollectionReference<FireKios>;
-
-  //   let qRef: Query<FireKios> = query(col, orderBy("Rating", "desc"));
-
-  //   // kategori utama
-  //   if (selected !== "all") {
-  //     qRef = query(
-  //       col,
-  //       where("Kategori", "in", [selected]),
-  //       orderBy("Rating", "desc")
-  //     );
-  //   }
-
-  //   // halal / featured
-  //   const wheres: ReturnType<typeof where>[] = [];
-  //   if (onlyHalal) wheres.push(where("Halal", "==", true));
-  //   if (onlyFeatured) wheres.push(where("Pilihan Kami", "==", true));
-
-  //   if (wheres.length > 0) {
-  //     // hanya halal/featured
-  //     qRef = query(col, ...wheres, orderBy("Rating", "desc"));
-
-  //     // kategori + halal/featured
-  //     if (selected !== "all") {
-  //       qRef = query(
-  //         col,
-  //         where("Kategori", "in", [selected]),
-  //         ...wheres,
-  //         orderBy("Rating", "desc")
-  //       );
-  //     }
-  //   }
-
-  //   return qRef;
-  // };
 
   const clearFilters = () => {
     setOnlyFeatured(false);
@@ -388,25 +357,40 @@ export default function LandingPage() {
       if (nameQ || locQ) {
         result = result.filter((x) => {
           const okName = !nameQ || x.name.toLowerCase().includes(nameQ);
-          const okLoc = !locQ || 
+          const okLoc =
+            !locQ ||
             x.location.toLowerCase().includes(locQ) ||
             // Additional check for more comprehensive location matching
-            (locQ.includes('kelurahan') && x.location.toLowerCase().includes(locQ.replace('kelurahan', '').trim())) ||
-            (locQ.includes('kecamatan') && x.location.toLowerCase().includes(locQ.replace('kecamatan', '').trim())) ||
-            (locQ.includes('kota') && x.location.toLowerCase().includes(locQ.replace('kota', '').trim())) ||
-            (locQ.includes('kabupaten') && x.location.toLowerCase().includes(locQ.replace('kabupaten', '').trim()));
+            (locQ.includes("kelurahan") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kelurahan", "").trim())) ||
+            (locQ.includes("kecamatan") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kecamatan", "").trim())) ||
+            (locQ.includes("kota") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kota", "").trim())) ||
+            (locQ.includes("kabupaten") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kabupaten", "").trim()));
           return okName && okLoc;
         });
       }
-      
+
       // Additional filter to ensure location matches if "Depok" is part of the query
-      if (locQ.toLowerCase().includes('depok')) {
-        result = result.filter((x) => x.location.toLowerCase().includes('depok'));
+      if (locQ.toLowerCase().includes("depok")) {
+        result = result.filter((x) =>
+          x.location.toLowerCase().includes("depok")
+        );
       }
 
       // Apply time and price sorting
       result = [...result]; // Create a copy for sorting
-      
+
       // First sort by price if price filter is selected
       if (priceFilter) {
         if (priceFilter === "rendah-tinggi") {
@@ -414,7 +398,7 @@ export default function LandingPage() {
         } else if (priceFilter === "tinggi-rendah") {
           result.sort((a, b) => b.price - a.price);
         }
-      } 
+      }
       // Then sort by time if time filter is selected
       else if (timeFilter) {
         if (timeFilter === "terbaru") {
@@ -422,7 +406,7 @@ export default function LandingPage() {
         } else if (timeFilter === "terlama") {
           result.sort((a, b) => a.rating - b.rating);
         }
-      } 
+      }
       // Otherwise sort by rating
       else {
         result.sort((a, b) => b.rating - a.rating);
@@ -438,8 +422,7 @@ export default function LandingPage() {
   };
 
   const getAwningColor = (k: UiKios) => {
-    if (onlyFeatured) return "yellow";
-    if (selected === "all") return k.isPilihanKami ? "yellow" : "red";
+    if (k.isPilihanKami) return "yellow";
     return "red";
   };
 
@@ -474,25 +457,40 @@ export default function LandingPage() {
       if (nameQ || locQ) {
         filtered = filtered.filter((x) => {
           const okName = !nameQ || x.name.toLowerCase().includes(nameQ);
-          const okLoc = !locQ || 
+          const okLoc =
+            !locQ ||
             x.location.toLowerCase().includes(locQ) ||
             // Additional check for more comprehensive location matching
-            (locQ.includes('kelurahan') && x.location.toLowerCase().includes(locQ.replace('kelurahan', '').trim())) ||
-            (locQ.includes('kecamatan') && x.location.toLowerCase().includes(locQ.replace('kecamatan', '').trim())) ||
-            (locQ.includes('kota') && x.location.toLowerCase().includes(locQ.replace('kota', '').trim())) ||
-            (locQ.includes('kabupaten') && x.location.toLowerCase().includes(locQ.replace('kabupaten', '').trim()));
+            (locQ.includes("kelurahan") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kelurahan", "").trim())) ||
+            (locQ.includes("kecamatan") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kecamatan", "").trim())) ||
+            (locQ.includes("kota") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kota", "").trim())) ||
+            (locQ.includes("kabupaten") &&
+              x.location
+                .toLowerCase()
+                .includes(locQ.replace("kabupaten", "").trim()));
           return okName && okLoc;
         });
       }
-      
+
       // Additional filter to ensure location matches if "Depok" is part of the query
-      if (locQ.toLowerCase().includes('depok')) {
-        filtered = filtered.filter((x) => x.location.toLowerCase().includes('depok'));
+      if (locQ.toLowerCase().includes("depok")) {
+        filtered = filtered.filter((x) =>
+          x.location.toLowerCase().includes("depok")
+        );
       }
 
       // Apply time and price sorting
       filtered = [...filtered]; // Create a copy for sorting
-      
+
       // First sort by price if price filter is selected
       if (priceFilter) {
         if (priceFilter === "rendah-tinggi") {
@@ -500,7 +498,7 @@ export default function LandingPage() {
         } else if (priceFilter === "tinggi-rendah") {
           filtered.sort((a, b) => b.price - a.price);
         }
-      } 
+      }
       // Then sort by time if time filter is selected
       else if (timeFilter) {
         if (timeFilter === "terbaru") {
@@ -508,7 +506,7 @@ export default function LandingPage() {
         } else if (timeFilter === "terlama") {
           filtered.sort((a, b) => a.rating - b.rating);
         }
-      } 
+      }
       // Otherwise sort by rating
       else {
         filtered.sort((a, b) => b.rating - a.rating);
@@ -537,16 +535,24 @@ export default function LandingPage() {
     }
     fetchFirstPage().catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, onlyFeatured, onlyHalal, umkmSearch, locationSearch, timeFilter, priceFilter]);
+  }, [
+    selected,
+    onlyFeatured,
+    onlyHalal,
+    umkmSearch,
+    locationSearch,
+    timeFilter,
+    priceFilter,
+  ]);
 
   // Search lokal (client-side) untuk nama/alamat—cukup ringan
   const filtered = useMemo(() => {
     const nameQ = umkmSearch.trim().toLowerCase();
     const locQ = locationSearch.trim().toLowerCase();
-    
+
     // Apply all filters: name, location
     let result = items;
-    
+
     // Apply name and location filters
     // When location is selected, first filter by location, then by name if needed
     if (locQ) {
@@ -554,79 +560,141 @@ export default function LandingPage() {
         // List of kecamatan and kelurahan in Depok based on provided data
         const depokAreas = [
           // Kecamatan Beji
-          'beji', 'beji timur', 'kemiri muka', 'kukusan', 'pondok cina', 'tanah baru',
+          "beji",
+          "beji timur",
+          "kemiri muka",
+          "kukusan",
+          "pondok cina",
+          "tanah baru",
           // Kecamatan Pancoran Mas
-          'pancoran mas', 'depok', 'depok jaya', 'mampang', 'rangkapan jaya',
+          "pancoran mas",
+          "depok",
+          "depok jaya",
+          "mampang",
+          "rangkapan jaya",
           // Kecamatan Cipayung
-          'cipayung', 'cipayung jaya', 'ratu jaya', 'pondok jaya', 'pondok terong',
+          "cipayung",
+          "cipayung jaya",
+          "ratu jaya",
+          "pondok jaya",
+          "pondok terong",
           // Kecamatan Sukmajaya
-          'sukmajaya', 'abadijaya', 'baktijaya', 'mekarjaya',
+          "sukmajaya",
+          "abadijaya",
+          "baktijaya",
+          "mekarjaya",
           // Kecamatan Cimanggis
-          'tugu', 'mekarsari', 'harjamukti', 'curug', 'cisalak pasar', 'sukatani',
+          "tugu",
+          "mekarsari",
+          "harjamukti",
+          "curug",
+          "cisalak pasar",
+          "sukatani",
           // Kecamatan Cilodong
-          'cilodong', 'jatimulya', 'kalibaru', 'kalimulya',
+          "cilodong",
+          "jatimulya",
+          "kalibaru",
+          "kalimulya",
           // Kecamatan Tapos
-          'tapos', 'cilangkap', 'sukatani', 'leuwinanggung',
+          "tapos",
+          "cilangkap",
+          "sukatani",
+          "leuwinanggung",
           // Kecamatan Cinere
-          'cinere', 'gandul', 'pangkalan jati', 'pangkalan jati baru',
+          "cinere",
+          "gandul",
+          "pangkalan jati",
+          "pangkalan jati baru",
           // Kecamatan Limo
-          'limo', 'grogol', 'krukut', 'meruyung',
+          "limo",
+          "grogol",
+          "krukut",
+          "meruyung",
           // Kecamatan Sawangan
-          'sawangan', 'sawangan baru', 'bedahan', 'cinangka',
+          "sawangan",
+          "sawangan baru",
+          "bedahan",
+          "cinangka",
           // Kecamatan Bojongsari
-          'bojongsari', 'bojongsari baru', 'curug', 'duren mekar', 'duren seribu', 'pondok petir'
+          "bojongsari",
+          "bojongsari baru",
+          "curug",
+          "duren mekar",
+          "duren seribu",
+          "pondok petir",
         ];
-        
+
         // Also include kecamatan names for filtering
         const depokKecamatans = [
-          'kecamatan beji', 'beji', 'kecamatan pancoran mas', 'pancoran mas',
-          'kecamatan cipayung', 'cipayung', 'kecamatan sukmajaya', 'sukmajaya',
-          'kecamatan cimanggis', 'cimanggis', 'kecamatan cilodong', 'cilodong',
-          'kecamatan tapos', 'tapos', 'kecamatan cinere', 'cinere',
-          'kecamatan limo', 'limo', 'kecamatan sawangan', 'sawangan',
-          'kecamatan bojongsari', 'bojongsari'
+          "kecamatan beji",
+          "beji",
+          "kecamatan pancoran mas",
+          "pancoran mas",
+          "kecamatan cipayung",
+          "cipayung",
+          "kecamatan sukmajaya",
+          "sukmajaya",
+          "kecamatan cimanggis",
+          "cimanggis",
+          "kecamatan cilodong",
+          "cilodong",
+          "kecamatan tapos",
+          "tapos",
+          "kecamatan cinere",
+          "cinere",
+          "kecamatan limo",
+          "limo",
+          "kecamatan sawangan",
+          "sawangan",
+          "kecamatan bojongsari",
+          "bojongsari",
         ];
-        
+
         const locQLower = locQ.toLowerCase();
-        
+
         // Check if the input matches any Depok area names
-        const matchesArea = depokAreas.some(area => 
-          locQLower.includes(area) || area.includes(locQLower)
+        const matchesArea = depokAreas.some(
+          (area) => locQLower.includes(area) || area.includes(locQLower)
         );
-        
+
         // Check if the input matches any kecamatan names
-        const matchesKecamatan = depokKecamatans.some(kec => 
-          locQLower.includes(kec) || kec.includes(locQLower)
+        const matchesKecamatan = depokKecamatans.some(
+          (kec) => locQLower.includes(kec) || kec.includes(locQLower)
         );
-        
+
         // If searching for a specific Depok area or kecamatan
         if (matchesArea || matchesKecamatan) {
           // Check if the item's location contains the area name and is in Depok
-          const locationMatch = x.location.toLowerCase().includes(locQLower) || 
-                               depokAreas.some(area => 
-                                 x.location.toLowerCase().includes(area) && locQLower.includes(area)
-                               ) ||
-                               depokKecamatans.some(kec => 
-                                 x.location.toLowerCase().includes(kec) && locQLower.includes(kec)
-                               );
-          
+          const locationMatch =
+            x.location.toLowerCase().includes(locQLower) ||
+            depokAreas.some(
+              (area) =>
+                x.location.toLowerCase().includes(area) &&
+                locQLower.includes(area)
+            ) ||
+            depokKecamatans.some(
+              (kec) =>
+                x.location.toLowerCase().includes(kec) &&
+                locQLower.includes(kec)
+            );
+
           // Also check if the location is in Depok
-          const inDepok = x.location.toLowerCase().includes('depok');
-          
+          const inDepok = x.location.toLowerCase().includes("depok");
+
           // Then apply name filter if also specified
           const nameCheck = !nameQ || x.name.toLowerCase().includes(nameQ);
-          
+
           return locationMatch && inDepok && nameCheck;
         } else {
           // General search - match location and ensure it's in Depok
           const locationMatch = x.location.toLowerCase().includes(locQLower);
-          const inDepok = x.location.toLowerCase().includes('depok');
+          const inDepok = x.location.toLowerCase().includes("depok");
           // Then apply name filter if also specified
           const nameCheck = !nameQ || x.name.toLowerCase().includes(nameQ);
           return locationMatch && inDepok && nameCheck;
         }
       });
-      
+
       // Then apply name filter if also specified
       if (nameQ) {
         result = result.filter((x) => x.name.toLowerCase().includes(nameQ));
@@ -638,7 +706,7 @@ export default function LandingPage() {
 
     // Apply time and price sorting (we handle this client-side after filtering)
     result = [...result]; // Create a copy for sorting
-    
+
     // First sort by price if price filter is selected
     if (priceFilter) {
       if (priceFilter === "rendah-tinggi") {
@@ -646,7 +714,7 @@ export default function LandingPage() {
       } else if (priceFilter === "tinggi-rendah") {
         result.sort((a, b) => b.price - a.price);
       }
-    } 
+    }
     // Then sort by time if time filter is selected
     else if (timeFilter) {
       if (timeFilter === "terbaru") {
@@ -654,12 +722,12 @@ export default function LandingPage() {
       } else if (timeFilter === "terlama") {
         result.sort((a, b) => a.rating - b.rating);
       }
-    } 
+    }
     // Otherwise sort by rating
     else {
       result.sort((a, b) => b.rating - a.rating);
     }
-    
+
     return result;
   }, [items, umkmSearch, locationSearch, timeFilter, priceFilter]);
 
@@ -723,7 +791,7 @@ export default function LandingPage() {
           isLoggedIn
             ? {
                 name: "User",
-                imageUrl: "https://i.pravatar.cc/100",
+                imageUrl: profileImageUrl || undefined,
                 onSettingsClick: () => navigate("/settings"),
                 onLogoutClick: () => {
                   localStorage.removeItem("isLoggedIn");

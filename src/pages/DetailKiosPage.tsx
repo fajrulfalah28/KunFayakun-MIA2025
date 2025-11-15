@@ -3,7 +3,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db, googleMapsApiKey } from "../firebase";
 
-import { Header, Footer, ProductCard, CheckBadgeIcon, GoFoodIcon, ShopeeFoodIcon, WhatsappIcon, InstagramIcon } from "../components";
+import {
+  Header,
+  Footer,
+  ProductCard,
+  CheckBadgeIcon,
+  GoFoodIcon,
+  ShopeeFoodIcon,
+  WhatsappIcon,
+  InstagramIcon,
+} from "../components";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLocationDot,
@@ -31,6 +40,7 @@ const KIOS_COLLECTIONS = [
   "Data Pecel Lele",
   "Data Pizza",
   "Data Seafood",
+  "kios",
 ] as const;
 
 type FirestoreKios = {
@@ -52,6 +62,7 @@ type FirestoreKios = {
   "Harga Produk"?: string;
   "Website / IG / ShopeeFood / GoFood"?: string;
   "Katalog Produk"?: string;
+  katalogProduk?: string;
 };
 
 type KiosData = {
@@ -77,48 +88,75 @@ type ProductItem = {
   image: string;
 };
 
-const convertFirestoreToKios = (raw: FirestoreKios): KiosData => {
-  const ratingNum =
-    typeof raw.Rating === "number" ? raw.Rating : parseFloat(raw.Rating ?? "0");
-
-  const totalReviewNum =
-    typeof raw["Total Review"] === "number"
-      ? raw["Total Review"]
-      : parseInt(raw["Total Review"] ?? "0");
-
+const convertFirestoreToKios = (raw: any): KiosData => {
   return {
-    name: raw["Nama UMKM"],
-    description: raw["Deskripsi UMKM"] ?? `Tentang ${raw["Nama UMKM"]}`,
+    // NAME
+    name: raw.namaKios ?? raw["Nama UMKM"] ?? "UMKM",
 
-    // 🔥 FIX foto tempat
-    image: raw["Foto Tempat"] ?? raw["Foto UMKM"] ?? "",
+    // DESCRIPTION
+    description:
+      raw.deskripsi ??
+      raw["Deskripsi UMKM"] ??
+      `Tentang ${raw.namaKios ?? "UMKM"}`,
 
-    address: raw["Alamat"] ?? "",
-    rating: ratingNum,
-    totalReviews: totalReviewNum,
+    // IMAGE: tempat dulu → fallback fotoKios → fallback default
+    image:
+      raw["Foto Tempat"] ??
+      (Array.isArray(raw.fotoKios) ? raw.fotoKios[0] : null) ??
+      raw["Foto UMKM"] ??
+      "https://source.unsplash.com/800x600/?food",
 
-    // 🔥 Hapus "Berdiri Sejak" (isi tetap tapi tidak dipakai UI)
-    establishedDate: raw["Tahun Berdiri"] ?? "",
+    // ADDRESS
+    address: raw.alamat?.text ?? raw["Alamat"] ?? "Alamat tidak tersedia",
 
-    operatingHours: raw["Jam Buka"] ?? raw["Jam Operasional"] ?? "-",
+    // RATING
+    rating:
+      typeof raw.rating === "number"
+        ? raw.rating
+        : parseFloat(raw.rating ?? raw.Rating ?? "0"),
 
-    // 🔥 FIX pilihan kami
+    // TOTAL REVIEW
+    totalReviews:
+      typeof raw.totalReview === "number"
+        ? raw.totalReview
+        : parseInt(raw.totalReview ?? raw["Total Review"] ?? "0"),
+
+    // OPERATING HOURS
+    operatingHours:
+      raw.jamBuka && raw.jamTutup
+        ? `${raw.jamBuka} - ${raw.jamTutup}`
+        : raw["Jam Operasional"] ?? raw["Jam Buka"] ?? "-",
+
+    // PILIHAN KAMI
     isPilihanKami:
+      raw.pilihanKami === true ||
       raw["Pilihan Kami"] === true ||
-      raw.Rekomendasi === true ||
-      raw.Rekomendasi === "true",
+      raw.Rekomendasi === true,
 
-    // 🔥 convert kategori jadi array
-    jenisProduk: Array.isArray(raw.Kategori)
+    // ESTABLISHED DATE
+    establishedDate: raw["Tahun Berdiri"] ?? "Tidak diketahui",
+    // JENIS PRODUK
+    jenisProduk: raw.kategori
+      ? [raw.kategori.toLowerCase()] // kategori dari Settings
+      : Array.isArray(raw.jenisProduk)
+      ? raw.jenisProduk
+      : Array.isArray(raw.Kategori)
       ? raw.Kategori
       : raw.Kategori
       ? [raw.Kategori]
       : [],
 
-    placeId: raw["Place ID"] ?? "",
+    // PLACE ID
+    placeId: raw.alamat?.placeId ?? raw["Place ID"] ?? "",
 
     // 🔥 Tambahkan sosial media
     socialLinks: raw["Website / IG / ShopeeFood / GoFood"] ?? "",
+
+    // KATALOG PRODUK
+    katalogImage:
+      Array.isArray(raw.katalogProduk) && raw.katalogProduk.length > 0
+        ? raw.katalogProduk[0].image
+        : null,
   };
 };
 
@@ -176,24 +214,22 @@ const detectCategory = (categories: string) => {
 
 // Fungsi untuk mengekstrak URL dari teks socialLinks
 const extractSocialLink = (text: string, platform: string): string => {
-  // Normalisasi teks agar lowercase untuk pencocokan
-  const lowerText = text.toLowerCase();
-  
   // Cari URL dalam teks
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  
-  if (platform === 'whatsapp') {
+
+  if (platform === "whatsapp") {
     // Cek apakah ada nomor WhatsApp dalam teks
-    const whatsappRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6}/g;
+    const whatsappRegex =
+      /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6}/g;
     const match = text.match(whatsappRegex);
     if (match) {
       // Ambil nomor pertama dan format untuk link WhatsApp
-      const phoneNumber = match[0].replace(/\D/g, '');
+      const phoneNumber = match[0].replace(/\D/g, "");
       // Format nomor untuk WhatsApp (tanpa nol di awal, dengan kode negara)
       let formattedNumber = phoneNumber;
-      if (phoneNumber.startsWith('0')) {
-        formattedNumber = '62' + phoneNumber.substring(1);
-      } else if (phoneNumber.startsWith('62')) {
+      if (phoneNumber.startsWith("0")) {
+        formattedNumber = "62" + phoneNumber.substring(1);
+      } else if (phoneNumber.startsWith("62")) {
         formattedNumber = phoneNumber;
       }
       return `https://wa.me/${formattedNumber}`;
@@ -201,19 +237,19 @@ const extractSocialLink = (text: string, platform: string): string => {
     // Coba temukan URL yang berisi kata 'whatsapp'
     const urls = text.match(urlRegex);
     if (urls) {
-      const whatsappUrl = urls.find(url => url.includes('whatsapp'));
+      const whatsappUrl = urls.find((url) => url.includes("whatsapp"));
       if (whatsappUrl) {
         return whatsappUrl;
       }
     }
-    return '#';
+    return "#";
   }
-  
-  if (platform === 'instagram') {
+
+  if (platform === "instagram") {
     // Cek apakah ada URL Instagram dalam teks
     const urls = text.match(urlRegex);
     if (urls) {
-      const instagramUrl = urls.find(url => url.includes('instagram.com'));
+      const instagramUrl = urls.find((url) => url.includes("instagram.com"));
       if (instagramUrl) {
         return instagramUrl;
       }
@@ -224,71 +260,58 @@ const extractSocialLink = (text: string, platform: string): string => {
     if (igMatches) {
       // Coba temukan yang terlihat seperti username Instagram
       for (const match of igMatches) {
-        if (match.includes('ig') || match.includes('instagram') || (!match.includes('@') && match.length <= 30 && !match.includes(' '))) {
-          const cleanUsername = match.replace('@', '').split(/[,\s]/)[0];
+        if (
+          match.includes("ig") ||
+          match.includes("instagram") ||
+          (!match.includes("@") && match.length <= 30 && !match.includes(" "))
+        ) {
+          const cleanUsername = match.replace("@", "").split(/[,\s]/)[0];
           if (cleanUsername) {
             return `https://www.instagram.com/${cleanUsername}`;
           }
         }
       }
     }
-    return '#';
+    return "#";
   }
-  
-  if (platform === 'gofood') {
+
+  if (platform === "gofood") {
     // Cek apakah ada URL GoFood dalam teks
     const urls = text.match(urlRegex);
     if (urls) {
-      const gofoodUrl = urls.find(url => url.includes('gofood.co.id') || url.includes('gojek.com'));
+      const gofoodUrl = urls.find(
+        (url) => url.includes("gofood.co.id") || url.includes("gojek.com")
+      );
       if (gofoodUrl) {
         return gofoodUrl;
       }
     }
-    return '#';
+    return "#";
   }
-  
-  if (platform === 'shopee') {
+
+  if (platform === "shopee") {
     // Cek apakah ada URL ShopeeFood dalam teks
     const urls = text.match(urlRegex);
     if (urls) {
-      const shopeeFoodUrl = urls.find(url => 
-        url.includes('shopee.co.id') && (url.includes('food') || url.toLowerCase().includes('sf'))
+      const shopeeFoodUrl = urls.find(
+        (url) =>
+          url.includes("shopee.co.id") &&
+          (url.includes("food") || url.toLowerCase().includes("sf"))
       );
       if (shopeeFoodUrl) {
         return shopeeFoodUrl;
       }
     }
-    return '#';
+    return "#";
   }
-  
+
   // Jika tidak ada URL eksplisit, kembalikan link default
-  return '#';
+  return "#";
 };
 
 export default function DetailKiosPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-
-  // Fungsi untuk mendapatkan semua social links sekaligus
-  const getAllSocialLinks = (socialText: string) => {
-    return {
-      gofood: extractSocialLink(socialText, "gofood"),
-      shopee: extractSocialLink(socialText, "shopee"),
-      whatsapp: extractSocialLink(socialText, "whatsapp"),
-      instagram: extractSocialLink(socialText, "instagram")
-    };
-  };
-
-  // Fungsi untuk mengecek apakah ada social media yang valid
-  const hasSocialMedia = (socialText: string) => {
-    const lowerText = socialText.toLowerCase();
-    return (
-      (lowerText.includes("gofood") || lowerText.includes("go food") || lowerText.includes("go-food")) ||
-      (lowerText.includes("shopee") && (lowerText.includes("food") || lowerText.includes("sf"))) ||
-      (lowerText.includes("whatsapp") || lowerText.includes("wa") || lowerText.includes("whatsap")) ||
-      (lowerText.includes("instagram") || lowerText.includes("ig"))
-    );
-  };
 
   const [loading, setLoading] = useState(true);
   const [kiosData, setKiosData] = useState<KiosData | null>(null);
@@ -297,6 +320,9 @@ export default function DetailKiosPage() {
   // Responsive stripes
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
+
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  const profileImageUrl = undefined;
 
   useEffect(() => {
     const check = () => {
@@ -352,14 +378,18 @@ export default function DetailKiosPage() {
           imageUrl = "https://source.unsplash.com/800x600/?food";
         }
 
-        setProducts([
-          {
-            id: 1,
-            name: raw["Nama UMKM"] + " — Produk 1",
-            price: parseInt(raw["Harga Produk"] ?? "0"),
-            image: imageUrl,
-          },
-        ]);
+        if (Array.isArray(raw.katalogProduk)) {
+          setProducts(
+            raw.katalogProduk.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              price: Number(p.price), // convert string → number
+              image: p.image,
+            }))
+          );
+        } else {
+          setProducts([]);
+        }
 
         setLoading(false);
       } catch (err) {
@@ -403,6 +433,19 @@ export default function DetailKiosPage() {
         showSearch
         locationSearch=""
         umkmSearch=""
+        userProfile={
+          isLoggedIn
+            ? {
+                name: "User",
+                imageUrl: profileImageUrl || undefined,
+                onSettingsClick: () => navigate("/settings"),
+                onLogoutClick: () => {
+                  localStorage.removeItem("isLoggedIn");
+                  window.location.reload();
+                },
+              }
+            : undefined
+        }
       />
 
       {/* Breadcrumb */}
@@ -516,77 +559,148 @@ export default function DetailKiosPage() {
             </div>
 
             {/* Temukan Kami Di - berada di bawah informasi kios dan sejajar dengan kategori */}
-            <div 
-              className="mt-3 p-4 rounded-[12px] flex flex-col items-start" 
+            <div
+              className="mt-3 p-4 rounded-[12px] flex flex-col items-start"
               style={{ backgroundColor: semanticColors.bgPrimary }}
             >
-              <span className="text-sm font-semibold" style={{ color: semanticColors.textPrimary }}>Temukan Kami di:</span>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: semanticColors.textPrimary }}
+              >
+                Temukan Kami di:
+              </span>
               <div className="flex items-center gap-4 mt-2 -translate-y-1">
-                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                     style={{ 
-                       backgroundColor: extractSocialLink(kiosData.socialLinks, "gofood") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
-                       transform: extractSocialLink(kiosData.socialLinks, "gofood") !== '#' ? 'scale(1)' : 'scale(1)',
-                       cursor: extractSocialLink(kiosData.socialLinks, "gofood") !== '#' ? 'pointer' : 'default',
-                       transition: 'all 0.3s ease'
-                     }}>
-                  <a 
-                    href="https://gofood.co.id" 
-                    target="_blank" 
+                <div
+                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                  style={{
+                    backgroundColor:
+                      extractSocialLink(kiosData.socialLinks, "gofood") !== "#"
+                        ? "#f0f0f0"
+                        : "rgba(0,0,0,0.1)",
+                    transform:
+                      extractSocialLink(kiosData.socialLinks, "gofood") !== "#"
+                        ? "scale(1)"
+                        : "scale(1)",
+                    cursor:
+                      extractSocialLink(kiosData.socialLinks, "gofood") !== "#"
+                        ? "pointer"
+                        : "default",
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  <a
+                    href="https://gofood.co.id"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
                   >
-                    <GoFoodIcon width={24} height={24} className="transition-all duration-300" />
+                    <GoFoodIcon
+                      width={24}
+                      height={24}
+                      className="transition-all duration-300"
+                    />
                   </a>
                 </div>
 
-                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                     style={{ 
-                       backgroundColor: extractSocialLink(kiosData.socialLinks, "shopee") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
-                       transform: extractSocialLink(kiosData.socialLinks, "shopee") !== '#' ? 'scale(1)' : 'scale(1)',
-                       cursor: extractSocialLink(kiosData.socialLinks, "shopee") !== '#' ? 'pointer' : 'default',
-                       transition: 'all 0.3s ease'
-                     }}>
-                  <a 
-                    href="https://shopee.co.id/food" 
-                    target="_blank" 
+                <div
+                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                  style={{
+                    backgroundColor:
+                      extractSocialLink(kiosData.socialLinks, "shopee") !== "#"
+                        ? "#f0f0f0"
+                        : "rgba(0,0,0,0.1)",
+                    transform:
+                      extractSocialLink(kiosData.socialLinks, "shopee") !== "#"
+                        ? "scale(1)"
+                        : "scale(1)",
+                    cursor:
+                      extractSocialLink(kiosData.socialLinks, "shopee") !== "#"
+                        ? "pointer"
+                        : "default",
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  <a
+                    href="https://shopee.co.id/food"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
                   >
-                    <ShopeeFoodIcon width={24} height={24} className="transition-all duration-300" />
+                    <ShopeeFoodIcon
+                      width={24}
+                      height={24}
+                      className="transition-all duration-300"
+                    />
                   </a>
                 </div>
 
-                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                     style={{ 
-                       backgroundColor: extractSocialLink(kiosData.socialLinks, "whatsapp") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
-                       transform: extractSocialLink(kiosData.socialLinks, "whatsapp") !== '#' ? 'scale(1)' : 'scale(1)',
-                       cursor: extractSocialLink(kiosData.socialLinks, "whatsapp") !== '#' ? 'pointer' : 'default',
-                       transition: 'all 0.3s ease'
-                     }}>
-                  <a 
-                    href={extractSocialLink(kiosData.socialLinks, "whatsapp")} 
-                    target="_blank" 
+                <div
+                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                  style={{
+                    backgroundColor:
+                      extractSocialLink(kiosData.socialLinks, "whatsapp") !==
+                      "#"
+                        ? "#f0f0f0"
+                        : "rgba(0,0,0,0.1)",
+                    transform:
+                      extractSocialLink(kiosData.socialLinks, "whatsapp") !==
+                      "#"
+                        ? "scale(1)"
+                        : "scale(1)",
+                    cursor:
+                      extractSocialLink(kiosData.socialLinks, "whatsapp") !==
+                      "#"
+                        ? "pointer"
+                        : "default",
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  <a
+                    href={extractSocialLink(kiosData.socialLinks, "whatsapp")}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
                   >
-                    <WhatsappIcon width={24} height={24} className="transition-all duration-300" />
+                    <WhatsappIcon
+                      width={24}
+                      height={24}
+                      className="transition-all duration-300"
+                    />
                   </a>
                 </div>
 
-                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                     style={{ 
-                       backgroundColor: extractSocialLink(kiosData.socialLinks, "instagram") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
-                       transform: extractSocialLink(kiosData.socialLinks, "instagram") !== '#' ? 'scale(1)' : 'scale(1)',
-                       cursor: extractSocialLink(kiosData.socialLinks, "instagram") !== '#' ? 'pointer' : 'default',
-                       transition: 'all 0.3s ease'
-                     }}>
-                  <a 
-                    href={extractSocialLink(kiosData.socialLinks, "instagram")} 
-                    target="_blank" 
+                <div
+                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                  style={{
+                    backgroundColor:
+                      extractSocialLink(kiosData.socialLinks, "instagram") !==
+                      "#"
+                        ? "#f0f0f0"
+                        : "rgba(0,0,0,0.1)",
+                    transform:
+                      extractSocialLink(kiosData.socialLinks, "instagram") !==
+                      "#"
+                        ? "scale(1)"
+                        : "scale(1)",
+                    cursor:
+                      extractSocialLink(kiosData.socialLinks, "instagram") !==
+                      "#"
+                        ? "pointer"
+                        : "default",
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  <a
+                    href={extractSocialLink(kiosData.socialLinks, "instagram")}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
                   >
-                    <InstagramIcon width={24} height={24} className="transition-all duration-300" />
+                    <InstagramIcon
+                      width={24}
+                      height={24}
+                      className="transition-all duration-300"
+                    />
                   </a>
                 </div>
               </div>
