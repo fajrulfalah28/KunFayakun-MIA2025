@@ -179,7 +179,9 @@ const extractSocialLink = (text: string, platform: string): string => {
   // Normalisasi teks agar lowercase untuk pencocokan
   const lowerText = text.toLowerCase();
   
-  // Jika platform adalah whatsapp, buat link WhatsApp
+  // Cari URL dalam teks
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
   if (platform === 'whatsapp') {
     // Cek apakah ada nomor WhatsApp dalam teks
     const whatsappRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6}/g;
@@ -196,57 +198,67 @@ const extractSocialLink = (text: string, platform: string): string => {
       }
       return `https://wa.me/${formattedNumber}`;
     }
-    // Jika tidak menemukan nomor, mungkin hanya ada tautan WhatsApp
-    if (lowerText.includes('whatsapp.com')) {
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urlMatch = text.match(urlRegex);
-      if (urlMatch) {
-        return urlMatch[0];
+    // Coba temukan URL yang berisi kata 'whatsapp'
+    const urls = text.match(urlRegex);
+    if (urls) {
+      const whatsappUrl = urls.find(url => url.includes('whatsapp'));
+      if (whatsappUrl) {
+        return whatsappUrl;
       }
     }
+    return '#';
   }
   
-  // Jika platform adalah instagram
   if (platform === 'instagram') {
-    if (lowerText.includes('instagram.com')) {
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urlMatch = text.match(urlRegex);
-      if (urlMatch) {
-        return urlMatch[0];
+    // Cek apakah ada URL Instagram dalam teks
+    const urls = text.match(urlRegex);
+    if (urls) {
+      const instagramUrl = urls.find(url => url.includes('instagram.com'));
+      if (instagramUrl) {
+        return instagramUrl;
       }
     }
     // Jika hanya username Instagram
-    const igRegex = /@?([\w.]+)/g;
-    const igMatches = text.match(igRegex);
-    if (igMatches && igMatches.length > 0) {
-      return `https://www.instagram.com/${igMatches[0].replace('@', '')}`;
+    const igUsernameRegex = /@?([\w.]+)/g;
+    const igMatches = text.match(igUsernameRegex);
+    if (igMatches) {
+      // Coba temukan yang terlihat seperti username Instagram
+      for (const match of igMatches) {
+        if (match.includes('ig') || match.includes('instagram') || (!match.includes('@') && match.length <= 30 && !match.includes(' '))) {
+          const cleanUsername = match.replace('@', '').split(/[,\s]/)[0];
+          if (cleanUsername) {
+            return `https://www.instagram.com/${cleanUsername}`;
+          }
+        }
+      }
     }
+    return '#';
   }
   
-  // Jika platform adalah gofood
   if (platform === 'gofood') {
-    if (lowerText.includes('gofood.co.id') || lowerText.includes('gojek.com')) {
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urlMatch = text.match(urlRegex);
-      if (urlMatch) {
-        return urlMatch[0];
+    // Cek apakah ada URL GoFood dalam teks
+    const urls = text.match(urlRegex);
+    if (urls) {
+      const gofoodUrl = urls.find(url => url.includes('gofood.co.id') || url.includes('gojek.com'));
+      if (gofoodUrl) {
+        return gofoodUrl;
       }
     }
-    // Alternatif GoFood link
-    return 'https://gofood.co.id';
+    return '#';
   }
   
-  // Jika platform adalah shopee
   if (platform === 'shopee') {
-    if (lowerText.includes('shopee') && (lowerText.includes('food') || lowerText.includes('sf'))) {
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urlMatch = text.match(urlRegex);
-      if (urlMatch) {
-        return urlMatch[0];
+    // Cek apakah ada URL ShopeeFood dalam teks
+    const urls = text.match(urlRegex);
+    if (urls) {
+      const shopeeFoodUrl = urls.find(url => 
+        url.includes('shopee.co.id') && (url.includes('food') || url.toLowerCase().includes('sf'))
+      );
+      if (shopeeFoodUrl) {
+        return shopeeFoodUrl;
       }
     }
-    // Alternatif ShopeeFood link
-    return 'https://shopee.co.id';
+    return '#';
   }
   
   // Jika tidak ada URL eksplisit, kembalikan link default
@@ -256,6 +268,27 @@ const extractSocialLink = (text: string, platform: string): string => {
 export default function DetailKiosPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // Fungsi untuk mendapatkan semua social links sekaligus
+  const getAllSocialLinks = (socialText: string) => {
+    return {
+      gofood: extractSocialLink(socialText, "gofood"),
+      shopee: extractSocialLink(socialText, "shopee"),
+      whatsapp: extractSocialLink(socialText, "whatsapp"),
+      instagram: extractSocialLink(socialText, "instagram")
+    };
+  };
+
+  // Fungsi untuk mengecek apakah ada social media yang valid
+  const hasSocialMedia = (socialText: string) => {
+    const lowerText = socialText.toLowerCase();
+    return (
+      (lowerText.includes("gofood") || lowerText.includes("go food") || lowerText.includes("go-food")) ||
+      (lowerText.includes("shopee") && (lowerText.includes("food") || lowerText.includes("sf"))) ||
+      (lowerText.includes("whatsapp") || lowerText.includes("wa") || lowerText.includes("whatsap")) ||
+      (lowerText.includes("instagram") || lowerText.includes("ig"))
+    );
+  };
 
   const [loading, setLoading] = useState(true);
   const [kiosData, setKiosData] = useState<KiosData | null>(null);
@@ -482,35 +515,82 @@ export default function DetailKiosPage() {
               </div>
             </div>
 
-            {kiosData.socialLinks.trim() !== "" && (
-              <div className="flex items-center gap-3 mt-3">
-                <span className="text-sm text-gray-500">Temukan Kami di:</span>
-
-                {kiosData.socialLinks.includes("instagram") && (
-                  <a href={extractSocialLink(kiosData.socialLinks, "instagram")} target="_blank" rel="noopener noreferrer">
-                    <InstagramIcon width={24} height={24} />
+            {/* Temukan Kami Di - berada di bawah informasi kios dan sejajar dengan kategori */}
+            <div 
+              className="mt-3 p-4 rounded-[12px] flex flex-col items-start" 
+              style={{ backgroundColor: semanticColors.bgPrimary }}
+            >
+              <span className="text-sm font-semibold" style={{ color: semanticColors.textPrimary }}>Temukan Kami di:</span>
+              <div className="flex items-center gap-4 mt-2 -translate-y-1">
+                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                     style={{ 
+                       backgroundColor: extractSocialLink(kiosData.socialLinks, "gofood") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
+                       transform: extractSocialLink(kiosData.socialLinks, "gofood") !== '#' ? 'scale(1)' : 'scale(1)',
+                       cursor: extractSocialLink(kiosData.socialLinks, "gofood") !== '#' ? 'pointer' : 'default',
+                       transition: 'all 0.3s ease'
+                     }}>
+                  <a 
+                    href="https://gofood.co.id" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                  >
+                    <GoFoodIcon width={24} height={24} className="transition-all duration-300" />
                   </a>
-                )}
+                </div>
 
-                {kiosData.socialLinks.includes("gofood") && (
-                  <a href={extractSocialLink(kiosData.socialLinks, "gofood")} target="_blank" rel="noopener noreferrer">
-                    <GoFoodIcon width={24} height={24} />
+                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                     style={{ 
+                       backgroundColor: extractSocialLink(kiosData.socialLinks, "shopee") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
+                       transform: extractSocialLink(kiosData.socialLinks, "shopee") !== '#' ? 'scale(1)' : 'scale(1)',
+                       cursor: extractSocialLink(kiosData.socialLinks, "shopee") !== '#' ? 'pointer' : 'default',
+                       transition: 'all 0.3s ease'
+                     }}>
+                  <a 
+                    href="https://shopee.co.id/food" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                  >
+                    <ShopeeFoodIcon width={24} height={24} className="transition-all duration-300" />
                   </a>
-                )}
+                </div>
 
-                {kiosData.socialLinks.includes("shopee") && (
-                  <a href={extractSocialLink(kiosData.socialLinks, "shopee")} target="_blank" rel="noopener noreferrer">
-                    <ShopeeFoodIcon width={24} height={24} />
+                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                     style={{ 
+                       backgroundColor: extractSocialLink(kiosData.socialLinks, "whatsapp") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
+                       transform: extractSocialLink(kiosData.socialLinks, "whatsapp") !== '#' ? 'scale(1)' : 'scale(1)',
+                       cursor: extractSocialLink(kiosData.socialLinks, "whatsapp") !== '#' ? 'pointer' : 'default',
+                       transition: 'all 0.3s ease'
+                     }}>
+                  <a 
+                    href={extractSocialLink(kiosData.socialLinks, "whatsapp")} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                  >
+                    <WhatsappIcon width={24} height={24} className="transition-all duration-300" />
                   </a>
-                )}
+                </div>
 
-                {kiosData.socialLinks.includes("whatsapp") && (
-                  <a href={extractSocialLink(kiosData.socialLinks, "whatsapp")} target="_blank" rel="noopener noreferrer">
-                    <WhatsappIcon width={24} height={24} />
+                <div className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
+                     style={{ 
+                       backgroundColor: extractSocialLink(kiosData.socialLinks, "instagram") !== '#' ? '#f0f0f0' : 'rgba(0,0,0,0.1)',
+                       transform: extractSocialLink(kiosData.socialLinks, "instagram") !== '#' ? 'scale(1)' : 'scale(1)',
+                       cursor: extractSocialLink(kiosData.socialLinks, "instagram") !== '#' ? 'pointer' : 'default',
+                       transition: 'all 0.3s ease'
+                     }}>
+                  <a 
+                    href={extractSocialLink(kiosData.socialLinks, "instagram")} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                  >
+                    <InstagramIcon width={24} height={24} className="transition-all duration-300" />
                   </a>
-                )}
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Map */}
             <div
