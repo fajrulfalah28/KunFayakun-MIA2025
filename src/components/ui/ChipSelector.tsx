@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode, CSSProperties } from 'react';
 import { useRef } from 'react';
 import { semanticColors } from '../../styles/colors';
 
@@ -48,44 +48,44 @@ export default function ChipSelector({
   };
 
   const styleConfig = getStyles();
+  const customStyle = (props as { style?: CSSProperties })?.style || {};
 
   return (
     <button
       className={`${baseStyles} whitespace-nowrap ${className}`}
-      style={{ ...styleConfig.style, userSelect: 'none' }}
+      style={{ ...styleConfig.style, userSelect: 'none', ...customStyle }}
       onMouseDown={(e) => {
         // Allow dragging to scroll parent container
-        const container = e.currentTarget.closest('[style*="overflow-x-auto"]') as HTMLElement;
+        const container = e.currentTarget.closest('[data-scrollable-container="true"]') as HTMLElement || 
+                         e.currentTarget.closest('[style*="overflow-x-auto"]') as HTMLElement;
         if (!container) return;
         
         const startX = e.pageX;
-        let currentScroll = container.scrollLeft;
+        const startY = e.pageY;
+        const startScroll = container.scrollLeft;
         isDraggingRef.current = false;
         let lastX = startX;
         let velocity = 0;
         let lastTime = Date.now();
-        let rafId: number | null = null;
         
         const onMouseMove = (e: MouseEvent) => {
           const currentTime = Date.now();
           const timeDelta = Math.max(currentTime - lastTime, 1);
           const diffX = e.pageX - startX;
+          const diffY = e.pageY - startY;
           const currentVelocity = (e.pageX - lastX) / timeDelta;
           
-          if (Math.abs(diffX) > 5) {
+          // Only consider it dragging if horizontal movement is greater than vertical
+          // and movement is more than 5px
+          if (Math.abs(diffX) > 5 && Math.abs(diffX) > Math.abs(diffY)) {
             isDraggingRef.current = true;
             velocity = currentVelocity * 0.3 + velocity * 0.7; // Smooth velocity with exponential moving average
             lastX = e.pageX;
             lastTime = currentTime;
             
-            // Use requestAnimationFrame for smooth updates
-            if (!rafId) {
-              rafId = requestAnimationFrame(() => {
-                const diffX = lastX - startX;
-                container.scrollLeft = currentScroll - diffX;
-                rafId = null;
-              });
-            }
+            // Scroll the container - drag left scrolls right, drag right scrolls left
+            const scrollDiff = startX - e.pageX;
+            container.scrollLeft = startScroll + scrollDiff;
             
             e.preventDefault();
             e.stopPropagation();
@@ -96,20 +96,13 @@ export default function ChipSelector({
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
           
-          if (rafId) {
-            cancelAnimationFrame(rafId);
-            rafId = null;
-          }
-          
-          // Update current scroll position
-          currentScroll = container.scrollLeft;
-          
           // Add momentum scrolling if dragging
           if (isDraggingRef.current && Math.abs(velocity) > 0.1) {
+            const currentScroll = container.scrollLeft;
             const momentum = velocity * 20; // Momentum multiplier
             const targetScroll = currentScroll - momentum;
-            const startScroll = currentScroll;
-            const distance = targetScroll - startScroll;
+            const momentumStartScroll = currentScroll;
+            const distance = targetScroll - momentumStartScroll;
             const duration = 400; // ms
             const startTime = Date.now();
             
@@ -122,8 +115,8 @@ export default function ChipSelector({
               const progress = Math.min(elapsed / duration, 1);
               const eased = easeOut(progress);
               
-              currentScroll = startScroll + distance * eased;
-              container.scrollLeft = currentScroll;
+              const scrollPos = momentumStartScroll + distance * eased;
+              container.scrollLeft = scrollPos;
               
               if (progress < 1) {
                 requestAnimationFrame(animateMomentum);

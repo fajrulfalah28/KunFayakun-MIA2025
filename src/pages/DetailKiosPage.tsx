@@ -7,7 +7,6 @@ import {
   Header,
   Footer,
   ProductCard,
-  CheckBadgeIcon,
   GoFoodIcon,
   ShopeeFoodIcon,
   WhatsappIcon,
@@ -15,7 +14,6 @@ import {
 } from "../components";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faLocationDot,
   faChevronRight,
   faPizzaSlice,
 } from "@fortawesome/free-solid-svg-icons";
@@ -461,14 +459,24 @@ export default function DetailKiosPage() {
 
       {/* MAIN CONTENT */}
       <section className="px-4 sm:px-6 lg:px-20 py-6">
-        <div className="max-w-[1440px] mx-auto flex flex-col lg:flex-row gap-8">
+        <div className="max-w-[1440px] mx-auto flex flex-col lg:flex-row gap-8 lg:items-stretch">
           {/* Left: Banner + Info */}
-          <div className="flex flex-col gap-4 w-full lg:w-fit">
-            <div className="relative w-full min-h-[330px] rounded-[12px] overflow-hidden">
+          <div className="flex flex-col gap-4 w-full lg:w-fit lg:shrink-0">
+            {/* Image with Awning */}
+            <div className="relative w-full flex-1 rounded-[12px] overflow-hidden min-h-[330px]">
               <img
                 src={kiosData.image}
                 className="absolute inset-0 w-full h-full object-cover"
                 alt={kiosData.name}
+              />
+
+              {/* Gradient Overlay */}
+              <div
+                className="absolute inset-0 rounded-[12px]"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.75))",
+                }}
               />
 
               {/* Awning Cover */}
@@ -476,7 +484,7 @@ export default function DetailKiosPage() {
                 {[...Array(totalStripes)].map((_, i) => (
                   <div
                     key={i}
-                    className={`flex-1 h-full ${
+                    className={`flex-1 h-full rounded-b-[12px] ${
                       i === 0 ? "rounded-tl-[12px]" : ""
                     } ${i === totalStripes - 1 ? "rounded-tr-[12px]" : ""}`}
                     style={{
@@ -487,247 +495,244 @@ export default function DetailKiosPage() {
               </div>
             </div>
 
-            {/* Info Grid */}
+            {/* Info Card */}
             <div
-              className="grid grid-cols-2 sm:flex gap-6 px-6 py-3 rounded-[12px]"
+              className="flex items-center lg:justify-center lg:gap-3 px-6 py-3 rounded-[12px] w-full"
               style={{ backgroundColor: semanticColors.bgPrimary }}
             >
-              <div className="flex flex-col items-center">
-                <p className="text-xs text-gray-500">Jam Buka</p>
-                <p className="text-lg font-bold">{kiosData.operatingHours}</p>
+              <div className="flex-1 lg:flex-none flex flex-col gap-[6px] items-center">
+                <p
+                  className="font-dm-sans font-regular text-sm text-center"
+                  style={{ color: semanticColors.textSecondary }}
+                >
+                  Jam Buka
+                </p>
+                <p
+                  className="font-dm-sans font-bold text-lg"
+                  style={{ color: semanticColors.textPrimary }}
+                >
+                  {kiosData.operatingHours}
+                </p>
               </div>
 
-              <div className="hidden sm:block h-12 w-px bg-gray-300" />
+              <div
+                className="h-12 w-px"
+                style={{
+                  borderLeft: `1px solid ${semanticColors.borderMedium}`,
+                }}
+              />
 
-              <div className="flex flex-col items-center">
-                <p className="text-xs text-gray-500">Rating</p>
-                <p className="text-lg font-bold">{kiosData.rating}</p>
+              <div className="flex-1 lg:flex-none flex flex-col gap-[6px] items-center">
+                <p
+                  className="font-dm-sans font-regular text-sm text-center"
+                  style={{ color: semanticColors.textSecondary }}
+                >
+                  Rating
+                </p>
+                <p
+                  className="font-dm-sans font-bold text-lg"
+                  style={{ color: semanticColors.textPrimary }}
+                >
+                  {kiosData.rating.toFixed(1)}
+                </p>
               </div>
 
-              <div className="hidden sm:block h-12 w-px bg-gray-300" />
+              <div
+                className="h-12 w-px"
+                style={{
+                  borderLeft: `1px solid ${semanticColors.borderMedium}`,
+                }}
+              />
 
-              <div className="flex flex-col items-center">
-                <p className="text-xs text-gray-500">Total Review</p>
-                <p className="text-lg font-bold">{kiosData.totalReviews}</p>
+              <div className="flex-1 lg:flex-none flex flex-col gap-[6px] items-center">
+                <p
+                  className="font-dm-sans font-regular text-sm text-center"
+                  style={{ color: semanticColors.textSecondary }}
+                >
+                  Total Review
+                </p>
+                <p
+                  className="font-dm-sans font-bold text-lg"
+                  style={{ color: semanticColors.textPrimary }}
+                >
+                  {kiosData.totalReviews}
+                </p>
               </div>
             </div>
           </div>
 
           {/* Right Content */}
-          <div className="flex-1 flex flex-col gap-4">
+          <div className="flex-1 flex flex-col gap-3 w-full">
+            {/* Details Card */}
             <div
-              className="p-6 rounded-[12px]"
+              className="p-6 rounded-[12px] flex flex-col gap-4"
               style={{ backgroundColor: semanticColors.bgPrimary }}
             >
-              <h1 className="text-3xl font-black">{kiosData.name}</h1>
-              <p className="mt-1 text-gray-600">{kiosData.description}</p>
+              {/* Title and Description */}
+              <div className="flex flex-col gap-[6px] pb-3" style={{ borderBottom: `1px solid ${semanticColors.borderMedium}` }}>
+                <h1
+                  className="font-nunito font-black text-2xl sm:text-3xl lg:text-[36px] leading-[100%]"
+                  style={{ color: semanticColors.textPrimary }}
+                >
+                  {kiosData.name}
+                </h1>
+                <p
+                  className="font-dm-sans font-regular text-xs"
+                  style={{ color: semanticColors.textSecondary }}
+                >
+                  {kiosData.description}
+                </p>
+              </div>
 
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {kiosData.isPilihanKami && (
-                  <div className="flex items-center px-2 py-1 border rounded-md gap-1">
-                    <CheckBadgeIcon width={14} height={14} />
-                    <span className="text-xs">Pilihan Kami</span>
-                  </div>
-                )}
-
-                {/* Halal */}
-                {kiosData.jenisProduk.some((c) =>
-                  c.toLowerCase().includes("halal")
-                ) && (
-                  <div className="flex items-center px-2 py-1 border rounded-md gap-1">
-                    <span className="text-xs">Halal</span>
-                  </div>
-                )}
-
-                {/* Kategori */}
+              {/* Category Chips */}
+              <div className="flex gap-3 flex-wrap">
                 {detectCategory(kiosData.jenisProduk.join(" ")).map(
                   (cat, i) => (
                     <div
                       key={i}
-                      className="flex items-center px-2 py-1 border rounded-md gap-1"
+                      className="flex items-center gap-[10px] px-3 py-2 rounded-[12px] border"
+                      style={{
+                        borderColor: semanticColors.borderMedium,
+                        borderWidth: "0.5px",
+                        backgroundColor: semanticColors.bgPrimary,
+                      }}
                     >
                       <FontAwesomeIcon
                         icon={cat.icon}
-                        className="w-3 h-3"
+                        className="w-4 h-4"
                         style={{ color: cat.color }}
                       />
-                      <span className="text-xs">{cat.name}</span>
+                      <span
+                        className="font-dm-sans font-regular text-sm"
+                        style={{ color: semanticColors.textPrimary }}
+                      >
+                        {cat.name}
+                      </span>
                     </div>
                   )
                 )}
               </div>
-            </div>
 
-            {/* Temukan Kami Di - berada di bawah informasi kios dan sejajar dengan kategori */}
-            <div
-              className="mt-3 p-4 rounded-[12px] flex flex-col items-start"
-              style={{ backgroundColor: semanticColors.bgPrimary }}
-            >
-              <span
-                className="text-sm font-semibold"
-                style={{ color: semanticColors.textPrimary }}
-              >
-                Temukan Kami di:
-              </span>
-              <div className="flex items-center gap-4 mt-2 -translate-y-1">
-                <div
-                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                  style={{
-                    backgroundColor:
-                      extractSocialLink(kiosData.socialLinks, "gofood") !== "#"
-                        ? "#f0f0f0"
-                        : "rgba(0,0,0,0.1)",
-                    transform:
-                      extractSocialLink(kiosData.socialLinks, "gofood") !== "#"
-                        ? "scale(1)"
-                        : "scale(1)",
-                    cursor:
-                      extractSocialLink(kiosData.socialLinks, "gofood") !== "#"
-                        ? "pointer"
-                        : "default",
-                    transition: "all 0.3s ease",
-                  }}
+              {/* Social Media Section */}
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                <span
+                  className="font-dm-sans font-regular text-[10px] sm:text-xs whitespace-nowrap"
+                  style={{ color: semanticColors.textSecondary }}
                 >
+                  Temukan Kami Di:
+                </span>
+                <div className="flex items-center gap-2">
                   <a
-                    href="https://gofood.co.id"
+                    href={extractSocialLink(kiosData.socialLinks, "shopee")}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                    className="flex items-center justify-center p-[10px] rounded-full border"
+                    style={{
+                      borderColor: semanticColors.borderMedium,
+                      borderWidth: "1px",
+                      width: "40px",
+                      height: "40px",
+                    }}
                   >
-                    <GoFoodIcon
-                      width={24}
-                      height={24}
-                      className="transition-all duration-300"
-                    />
+                    <ShopeeFoodIcon width={20} height={20} />
                   </a>
-                </div>
-
-                <div
-                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                  style={{
-                    backgroundColor:
-                      extractSocialLink(kiosData.socialLinks, "shopee") !== "#"
-                        ? "#f0f0f0"
-                        : "rgba(0,0,0,0.1)",
-                    transform:
-                      extractSocialLink(kiosData.socialLinks, "shopee") !== "#"
-                        ? "scale(1)"
-                        : "scale(1)",
-                    cursor:
-                      extractSocialLink(kiosData.socialLinks, "shopee") !== "#"
-                        ? "pointer"
-                        : "default",
-                    transition: "all 0.3s ease",
-                  }}
-                >
                   <a
-                    href="https://shopee.co.id/food"
+                    href={extractSocialLink(kiosData.socialLinks, "gofood")}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                    className="flex items-center justify-center p-[10px] rounded-full border"
+                    style={{
+                      borderColor: semanticColors.borderMedium,
+                      borderWidth: "1px",
+                      width: "40px",
+                      height: "40px",
+                    }}
                   >
-                    <ShopeeFoodIcon
-                      width={24}
-                      height={24}
-                      className="transition-all duration-300"
-                    />
+                    <GoFoodIcon width={20} height={20} />
                   </a>
-                </div>
-
-                <div
-                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                  style={{
-                    backgroundColor:
-                      extractSocialLink(kiosData.socialLinks, "whatsapp") !==
-                      "#"
-                        ? "#f0f0f0"
-                        : "rgba(0,0,0,0.1)",
-                    transform:
-                      extractSocialLink(kiosData.socialLinks, "whatsapp") !==
-                      "#"
-                        ? "scale(1)"
-                        : "scale(1)",
-                    cursor:
-                      extractSocialLink(kiosData.socialLinks, "whatsapp") !==
-                      "#"
-                        ? "pointer"
-                        : "default",
-                    transition: "all 0.3s ease",
-                  }}
-                >
                   <a
                     href={extractSocialLink(kiosData.socialLinks, "whatsapp")}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                    className="flex items-center justify-center p-[10px] rounded-full border"
+                    style={{
+                      borderColor: semanticColors.borderMedium,
+                      borderWidth: "1px",
+                      width: "40px",
+                      height: "40px",
+                    }}
                   >
-                    <WhatsappIcon
-                      width={24}
-                      height={24}
-                      className="transition-all duration-300"
-                    />
+                    <WhatsappIcon width={20} height={20} />
                   </a>
-                </div>
-
-                <div
-                  className="p-1 rounded-full transition-all duration-300 hover:scale-110 cursor-pointer"
-                  style={{
-                    backgroundColor:
-                      extractSocialLink(kiosData.socialLinks, "instagram") !==
-                      "#"
-                        ? "#f0f0f0"
-                        : "rgba(0,0,0,0.1)",
-                    transform:
-                      extractSocialLink(kiosData.socialLinks, "instagram") !==
-                      "#"
-                        ? "scale(1)"
-                        : "scale(1)",
-                    cursor:
-                      extractSocialLink(kiosData.socialLinks, "instagram") !==
-                      "#"
-                        ? "pointer"
-                        : "default",
-                    transition: "all 0.3s ease",
-                  }}
-                >
                   <a
                     href={extractSocialLink(kiosData.socialLinks, "instagram")}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block transition-all duration-300 hover:brightness-150 hover:contrast-150 hover:saturate-150"
+                    className="flex items-center justify-center p-[10px] rounded-full border"
+                    style={{
+                      borderColor: semanticColors.borderMedium,
+                      borderWidth: "1px",
+                      width: "40px",
+                      height: "40px",
+                    }}
                   >
-                    <InstagramIcon
-                      width={24}
-                      height={24}
-                      className="transition-all duration-300"
-                    />
+                    <InstagramIcon width={20} height={20} />
                   </a>
                 </div>
               </div>
             </div>
 
-            {/* Map */}
+            {/* Map Card */}
             <div
-              className="p-6 rounded-[12px]"
+              className="p-6 rounded-[12px] flex flex-col gap-4"
               style={{ backgroundColor: semanticColors.bgPrimary }}
             >
-              <div className="flex gap-2 items-center">
-                <FontAwesomeIcon icon={faLocationDot} />
-                <h3 className="font-bold text-sm">Lokasi UMKM</h3>
+              <div className="flex flex-col gap-[6px]">
+                <div className="flex items-center gap-[6px]">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 1.5C4.205 1.5 2.75 2.955 2.75 4.75C2.75 7.125 6 10.5 6 10.5C6 10.5 9.25 7.125 9.25 4.75C9.25 2.955 7.795 1.5 6 1.5ZM6 6C5.31 6 4.75 5.44 4.75 4.75C4.75 4.06 5.31 3.5 6 3.5C6.69 3.5 7.25 4.06 7.25 4.75C7.25 5.44 6.69 6 6 6Z"
+                      fill={semanticColors.textPrimary}
+                    />
+                  </svg>
+                  <h3
+                    className="font-dm-sans font-bold text-sm"
+                    style={{ color: semanticColors.textPrimary }}
+                  >
+                    Lihat Melalui Google Map
+                  </h3>
+                </div>
+                <p
+                  className="font-dm-sans font-regular text-xs"
+                  style={{ color: semanticColors.textSecondary }}
+                >
+                  {kiosData.address}
+                </p>
               </div>
 
-              <p className="text-xs text-gray-600 mt-1">{kiosData.address}</p>
-
-              <div className="h-[150px] rounded-[12px] border mt-3 overflow-hidden">
+              <div
+                className="h-[144px] rounded-[12px] overflow-hidden border-2"
+                style={{ borderColor: semanticColors.borderMedium }}
+              >
                 {kiosData.placeId ? (
                   <iframe
                     width="100%"
                     height="100%"
                     src={`https://www.google.com/maps/embed/v1/place?q=place_id:${kiosData.placeId}&key=${googleMapsApiKey}`}
                     allowFullScreen
+                    style={{ border: "none" }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                  <div
+                    className="w-full h-full flex items-center justify-center"
+                    style={{ backgroundColor: semanticColors.bgTertiary, color: semanticColors.textSecondary }}
+                  >
                     Lokasi tidak tersedia
                   </div>
                 )}

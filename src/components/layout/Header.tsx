@@ -4,7 +4,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeart,
   faSearch,
-  faUser,
   faGear,
   faRightFromBracket,
   faTimes,
@@ -233,18 +232,14 @@ export default function Header({
                         className="w-5 h-5"
                         style={{ color: semanticColors.textPrimary }}
                       />
-                    ) : userProfile.imageUrl ? (
+                    ) : profilePhoto ? (
                       <img
-                        src={userProfile.imageUrl}
+                        src={profilePhoto}
                         alt={userProfile.name || "Profile"}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover rounded-full"
                       />
                     ) : (
-                      <FontAwesomeIcon
-                        icon={faUser}
-                        className="w-5 h-5"
-                        style={{ color: semanticColors.textPrimary }}
-                      />
+                      <DefaultProfileAvatar size={39} />
                     )}
                   </button>
                 </div>

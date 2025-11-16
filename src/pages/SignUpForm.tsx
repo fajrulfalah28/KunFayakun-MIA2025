@@ -185,7 +185,12 @@ export default function SignUpForm() {
               }
               error={errors.contact}
               leftIcon={
-                <span style={{ color: semanticColors.textPrimary }}>+62</span>
+                <span
+                  className="font-dm-sans font-regular text-sm"
+                  style={{ color: semanticColors.textPrimary }}
+                >
+                  +62
+                </span>
               }
             />
 

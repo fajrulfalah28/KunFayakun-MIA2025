@@ -14,21 +14,6 @@ import { semanticColors, brandColors, colors } from "../../styles/colors";
 import HalalIcon from "../icons/HalalIcon";
 import CheckBadgeIcon from "../icons/CheckBadgeIcon";
 
-// Category mapping for icons and colors
-// const categoryMap: Record<
-//   string,
-//   { icon: typeof faUtensils | null; iconColor: string }
-// > = {
-//   Makanan: { icon: faUtensils, iconColor: "#FF6B35" },
-//   Minuman: { icon: faMugHot, iconColor: "#4A90E2" },
-//   Cemilan: { icon: faCookie, iconColor: "#D2691E" },
-//   Kopi: { icon: faMugHot, iconColor: "#6F4E37" },
-//   Nusantara: { icon: faBowlRice, iconColor: semanticColors.textPrimary },
-//   Dessert: { icon: faIceCream, iconColor: "#FF69B4" },
-//   Diet: { icon: faLeaf, iconColor: "#90EE90" },
-//   Pedas: { icon: faPepperHot, iconColor: "#FF4500" },
-// };
-
 const detectCategory = (
   categories: string
 ): { name: string; icon: IconDefinition; color: string }[] => {
@@ -94,7 +79,7 @@ const detectCategory = (
 interface KiosCardProps {
   image: string;
   name: string;
-  categories: string;
+  categories?: string;
   description?: string;
   location: string;
   rating: number;
@@ -178,10 +163,10 @@ export default function KiosCard({
 
       {/* Card Content */}
       <div className="p-3 flex flex-col gap-2">
-        {/* Categories/Tags - Above Title */}
+        {/* Tags - Pilihan Kami, Halal, and Categories */}
         <div className="flex gap-[6px] items-center overflow-hidden">
           {isPilihanKami && (
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-[4px] shrink-0">
               <CheckBadgeIcon
                 width={12}
                 height={12}
@@ -197,7 +182,7 @@ export default function KiosCard({
           )}
 
           {isHalal && (
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-[4px] shrink-0">
               <HalalIcon width={12} height={12} />
               <span
                 className="font-dm-sans font-regular text-xs whitespace-nowrap"
@@ -209,29 +194,30 @@ export default function KiosCard({
           )}
 
           {/* Category Tags */}
-          {detectCategory(categories).map((c, index) => (
-            <div key={index} className="flex items-center gap-1 shrink-0">
-              <FontAwesomeIcon
-                icon={c.icon}
-                className="w-3 h-3"
-                style={{
-                  color: c.color,
-                  width: "12px",
-                  height: "12px",
-                }}
-              />
-              <span
-                className="font-dm-sans font-regular text-xs whitespace-nowrap"
-                style={{ color: semanticColors.textPrimary }}
-              >
-                {c.name}
-              </span>
-            </div>
-          ))}
+          {categories &&
+            detectCategory(categories).map((c, index) => (
+              <div key={index} className="flex items-center gap-[4px] shrink-0">
+                <FontAwesomeIcon
+                  icon={c.icon}
+                  className="w-3 h-3"
+                  style={{
+                    color: c.color,
+                    width: "12px",
+                    height: "12px",
+                  }}
+                />
+                <span
+                  className="font-dm-sans font-regular text-xs whitespace-nowrap"
+                  style={{ color: semanticColors.textPrimary }}
+                >
+                  {c.name}
+                </span>
+              </div>
+            ))}
         </div>
 
         {/* Shop Name and Description */}
-        <div className="flex flex-col gap-0">
+        <div className="flex flex-col gap-[2px]">
           <h3
             className="font-dm-sans font-bold text-lg line-clamp-1"
             style={{ color: semanticColors.textPrimary }}
@@ -248,18 +234,77 @@ export default function KiosCard({
           )}
         </div>
 
+        {/* Price */}
         {price !== undefined && price > 0 && (
-          <p
-            className="font-dm-sans font-bold text-sm"
-            style={{ color: brandColors.secondary }}
-          >
-            Rp {price.toLocaleString("id-ID")}
-          </p>
+          <div className="flex flex-col gap-[2px]">
+            <p
+              className="font-dm-sans font-bold text-sm"
+              style={{ color: brandColors.secondary }}
+            >
+              Rp {price.toLocaleString("id-ID")}
+            </p>
+          </div>
         )}
 
-        {/* Location, Rating, Operating Hours */}
-        <div className="flex items-center gap-[6px] text-xs">
-          {/* Location */}
+        {/* Rating, Operating Hours, and Location */}
+        <div className="flex flex-col gap-[4px]">
+          {/* Rating and Operating Hours on one line */}
+          <div className="flex items-center gap-[6px]">
+            {/* Rating */}
+            <div className="flex items-center gap-1">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M6 1.5L7.545 4.635L11 5.13L8.5 7.56L9.09 11L6 9.375L2.91 11L3.5 7.56L1 5.13L4.455 4.635L6 1.5Z"
+                  fill={brandColors.secondary}
+                  stroke={brandColors.secondary}
+                  strokeWidth="0.5"
+                />
+              </svg>
+              <span
+                className="font-dm-sans font-regular text-xs"
+                style={{ color: semanticColors.bgDark }}
+              >
+                {rating.toFixed(1)}
+              </span>
+            </div>
+
+            <span
+              className="font-dm-sans font-regular text-xs"
+              style={{ color: semanticColors.bgDark }}
+            >
+              |
+            </span>
+
+            {/* Operating Hours */}
+            <div className="flex items-center gap-1">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M6 1.5C3.515 1.5 1.5 3.515 1.5 6C1.5 8.485 3.515 10.5 6 10.5C8.485 10.5 10.5 8.485 10.5 6C10.5 3.515 8.485 1.5 6 1.5ZM7.75 6.75H6C5.86 6.75 5.75 6.64 5.75 6.5V3.5C5.75 3.36 5.86 3.25 6 3.25C6.14 3.25 6.25 3.36 6.25 3.5V6.25H7.75C7.89 6.25 8 6.36 8 6.5C8 6.64 7.89 6.75 7.75 6.75Z"
+                  fill={semanticColors.bgDark}
+                />
+              </svg>
+              <span
+                className="font-dm-sans font-regular text-xs whitespace-nowrap"
+                style={{ color: semanticColors.bgDark }}
+              >
+                {operatingHours}
+              </span>
+            </div>
+          </div>
+
+          {/* Location on separate line */}
           <div className="flex items-center gap-1">
             <svg
               width="12"
@@ -274,60 +319,10 @@ export default function KiosCard({
               />
             </svg>
             <span
-              className="font-dm-sans font-regular"
+              className="font-dm-sans font-regular text-xs line-clamp-1"
               style={{ color: semanticColors.bgDark }}
             >
               {location}
-            </span>
-          </div>
-
-          <span style={{ color: semanticColors.bgDark }}>|</span>
-
-          {/* Rating */}
-          <div className="flex items-center gap-1">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M6 1.5L7.545 4.635L11 5.13L8.5 7.56L9.09 11L6 9.375L2.91 11L3.5 7.56L1 5.13L4.455 4.635L6 1.5Z"
-                fill={brandColors.secondary}
-                stroke={brandColors.secondary}
-                strokeWidth="0.5"
-              />
-            </svg>
-            <span
-              className="font-dm-sans font-regular"
-              style={{ color: semanticColors.bgDark }}
-            >
-              {rating.toFixed(1)}
-            </span>
-          </div>
-
-          <span style={{ color: semanticColors.bgDark }}>|</span>
-
-          {/* Operating Hours */}
-          <div className="flex items-center gap-1">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M6 1.5C3.515 1.5 1.5 3.515 1.5 6C1.5 8.485 3.515 10.5 6 10.5C8.485 10.5 10.5 8.485 10.5 6C10.5 3.515 8.485 1.5 6 1.5ZM7.75 6.75H6C5.86 6.75 5.75 6.64 5.75 6.5V3.5C5.75 3.36 5.86 3.25 6 3.25C6.14 3.25 6.25 3.36 6.25 3.5V6.25H7.75C7.89 6.25 8 6.36 8 6.5C8 6.64 7.89 6.75 7.75 6.75Z"
-                fill={semanticColors.bgDark}
-              />
-            </svg>
-            <span
-              className="font-dm-sans font-regular whitespace-nowrap"
-              style={{ color: semanticColors.bgDark }}
-            >
-              {operatingHours}
             </span>
           </div>
         </div>

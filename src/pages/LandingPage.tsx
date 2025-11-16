@@ -840,7 +840,14 @@ export default function LandingPage() {
           <div
             ref={chipsContainerRef}
             className="flex gap-4 flex-1 min-w-0 overflow-x-auto scrollbar-hide scroll-smooth flex-nowrap"
-            style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
+            style={{ 
+              touchAction: "pan-x", 
+              WebkitOverflowScrolling: "touch", 
+              overflowX: "auto",
+              display: "flex",
+              flexWrap: "nowrap"
+            }}
+            data-scrollable-container="true"
           >
             {/* Kategori fixed */}
             {chipDefs.map((c) => {
@@ -900,7 +907,7 @@ export default function LandingPage() {
                     icon={
                       <FontAwesomeIcon
                         icon={faUtensils}
-                        style={{ color: "#2563eb" }}
+                        style={{ color: "#000000" }}
                       />
                     }
                     isSelected={
