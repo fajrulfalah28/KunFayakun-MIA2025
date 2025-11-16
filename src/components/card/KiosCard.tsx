@@ -306,18 +306,21 @@ export default function KiosCard({
 
           {/* Location on separate line */}
           <div className="flex items-center gap-1">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M6 1.5C4.205 1.5 2.75 2.955 2.75 4.75C2.75 7.125 6 10.5 6 10.5C6 10.5 9.25 7.125 9.25 4.75C9.25 2.955 7.795 1.5 6 1.5ZM6 6C5.31 6 4.75 5.44 4.75 4.75C4.75 4.06 5.31 3.5 6 3.5C6.69 3.5 7.25 4.06 7.25 4.75C7.25 5.44 6.69 6 6 6Z"
-                fill={semanticColors.bgDark}
-              />
-            </svg>
+            <div className="flex items-center justify-center shrink-0" style={{ width: "12px", height: "12px" }}>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ width: "12px", height: "12px", flexShrink: 0 }}
+              >
+                <path
+                  d="M6 1.5C4.205 1.5 2.75 2.955 2.75 4.75C2.75 7.125 6 10.5 6 10.5C6 10.5 9.25 7.125 9.25 4.75C9.25 2.955 7.795 1.5 6 1.5ZM6 6C5.31 6 4.75 5.44 4.75 4.75C4.75 4.06 5.31 3.5 6 3.5C6.69 3.5 7.25 4.06 7.25 4.75C7.25 5.44 6.69 6 6 6Z"
+                  fill={semanticColors.bgDark}
+                />
+              </svg>
+            </div>
             <span
               className="font-dm-sans font-regular text-xs line-clamp-1"
               style={{ color: semanticColors.bgDark }}
