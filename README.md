@@ -20,7 +20,7 @@ KiosKu adalah web aplikasi direktori digital yang berfungsi sebagai "Google Maps
 
 ```bash
 # 1. Clone repository
-git clone [<repository-url>](https://github.com/fajrulfalah28/KunFayakun-MIA2025.git)
+git clone (https://github.com/fajrulfalah28/KunFayakun-MIA2025.git)
 
 # 2. Masuk ke folder project
 cd kiosku
