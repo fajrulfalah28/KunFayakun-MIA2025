@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# KiosKu - Web Direktori UMKM Lokal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 📝 Deskripsi Singkat
+KiosKu adalah web aplikasi direktori digital yang berfungsi sebagai "Google Maps" khusus untuk Usaha Mikro, Kecil, dan Menengah (UMKM) lokal, mengatasi masalah sulitnya bisnis lokal ditemukan secara online. Platform ini menyajikan direktori UMKM dalam tampilan yang menarik dan mudah dicari berdasarkan nama atau filter kategori, dengan keunggulan utama pada integrasi peta Google Maps secara real-time untuk menunjukkan lokasi fisik kios yang akurat. Selain memudahkan pelanggan menemukan dan mendukung Kios favorit mereka, KiosKu juga menyediakan dashboard bagi pemilik UMKM untuk mengelola profil, jam operasional, dan mengintegrasikan tautan order ke platform penjualan eksternal (seperti GoFood atau WhatsApp), menjadikan KiosKu pusat informasi terpadu yang memodernisasi kehadiran digital UMKM.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠️ Tech Stack
+- HTML
+- CSS
+- JavaScript / TypeScript
+- React (Vite)
+- Tailwind CSS
+- Firebase (Auth, Firestore, & Storage)
+- Google Maps API
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Cara Menjalankan Project
 
-## Expanding the ESLint configuration
+```bash
+# 1. Clone repository
+git clone [<repository-url>](https://github.com/fajrulfalah28/KunFayakun-MIA2025.git)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# 2. Masuk ke folder project
+cd kiosku
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# 3. Install dependencies
+npm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 4. Jalankan aplikasi
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 📈 Progress Saat Ini
+✔️ Landing page
+✔️ Home page + filter kategori
+✔️ Halaman detail UMKM + produk
+✔️ Maps & lokasi otomatis
+✔️ Fitur favorit
+✔️ UI/UX final
+✔️ Semua fitur sudah selesai
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Link Web Aplikasi
+- https://celadon-sprite-2775a5.netlify.app
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 📸 Preview
+
+| Halaman | Tampilan |
+|--------|-----------|
+| **Landing Page** | <img width="1348" height="595" alt="Landing Page" src="https://github.com/user-attachments/assets/d37a7d93-ff32-4767-b0f0-ecdf85436937" /> |
+| **Daftar (Register)** | <img width="1358" height="595" alt="Daftar" src="https://github.com/user-attachments/assets/4122aba6-3df1-4727-aca0-9210d69773cd" /> |
+| **Masuk (Login)** | <img width="1359" height="599" alt="Masuk" src="https://github.com/user-attachments/assets/c4f177c5-646e-4f39-b7a6-41dfa751e88a" /> |
+| **Detail UMKM** | <img width="1345" height="596" alt="Detail" src="https://github.com/user-attachments/assets/c176376a-7e6a-446e-ae7d-f50506ce8232" /> |
+| **Favorit** | <img width="1356" height="596" alt="Favorit" src="https://github.com/user-attachments/assets/83a5ad1e-30a0-4d09-ba1b-f3fcffe12aea" /> |
+| **Edit Profil** | <img width="1347" height="558" alt="Edit Profile" src="https://github.com/user-attachments/assets/0d259bf7-52ce-4ca2-9392-b901ee34d502" /> |
+| **Buat Kios UMKM** | <img width="1345" height="593" alt="Buat Kios" src="https://github.com/user-attachments/assets/a4ccdabb-03e1-42c8-a27a-c0bc608ba605" /><br/><img width="1343" height="595" alt="Buat Kios 2" src="https://github.com/user-attachments/assets/f95c4843-7cb9-48b5-a55a-d3956861af72" /> |
+
+
+
+
+
+
+
+
+
